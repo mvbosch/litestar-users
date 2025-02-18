@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any, Generic, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from uuid import UUID, uuid4
 
 from advanced_alchemy.exceptions import IntegrityError, NotFoundError
@@ -18,6 +18,8 @@ __all__ = ["BaseUserService"]
 
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from advanced_alchemy.filters import StatementFilter
     from advanced_alchemy.repository import LoadSpec
     from advanced_alchemy.repository.typing import OrderingPair
