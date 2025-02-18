@@ -17,7 +17,7 @@ theme:
       toggle:
         icon: material/brightness-4
         name: Switch to system preference
-repo_url: https://github.com/LonelyVikingMichael/litestar-users
+repo_url: https://github.com/mvbosch/litestar-users
 nav:
   - Intro: index.md
   - Usage:
@@ -32,6 +32,7 @@ nav:
       - reference/0-config.md
       - reference/1-user-service.md
       - reference/2-route-handler-configs.md
+      - reference/3-model-mixins.md
 plugins:
   - search:
       lang: en

@@ -12,7 +12,7 @@ The [SQLAlchemyUserMixin][litestar_users.adapter.sqlalchemy.mixins.SQLAlchemyUse
 ### SQLAlchemy User
 
 !!! important
-    Litestar-Users is reliant on the [SQLAlchemyPlugin][advanced_alchemy.extensions.litestar.plugins.init.plugin.SQLAlchemyInitPlugin] for session management and dependency injection, this ensures that no more than one SQLAlchemy session is spun up per request lifecycle.
+    Litestar-Users is reliant on the [SQLAlchemyPlugin][advanced_alchemy.extensions.litestar.plugins.SQLAlchemyInitPlugin] for session management and dependency injection, this ensures that no more than one SQLAlchemy session is spun up per request lifecycle.
 
 ```python
 from advanced_alchemy.base import UUIDBase
