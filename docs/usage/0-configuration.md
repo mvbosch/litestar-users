@@ -66,6 +66,7 @@ class UserService(BaseUserService[User, Any]):  # type: ignore[type-var]
 sqlalchemy_config = SQLAlchemyAsyncConfig(
     connection_string=DATABASE_URL,
     session_dependency_key="session",
+    before_send_handler="autocommit",
 )
 
 litestar_users = LitestarUsersPlugin(
@@ -77,7 +78,6 @@ litestar_users = LitestarUsersPlugin(
         user_registration_dto=UserRegistrationDTO,
         user_update_dto=UserUpdateDTO,
         user_service_class=UserService,  # pyright: ignore
-        auto_commit_transactions=False,
         auth_handler_config=AuthHandlerConfig(),
         register_handler_config=RegisterHandlerConfig(),
         verification_handler_config=VerificationHandlerConfig(),
