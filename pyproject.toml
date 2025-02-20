@@ -13,7 +13,7 @@ dependencies = [
     "argon2-cffi",
     "pyyaml!=5.4.*",
     "libpass>=1.8.1,<2",
-    "advanced-alchemy>=0.27.0",
+    "advanced-alchemy>=0.31.0",
 ]
 
 [dependency-groups]
