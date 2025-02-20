@@ -1,6 +1,6 @@
 from collections.abc import AsyncIterator, Generator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import pytest
@@ -42,7 +42,7 @@ class User(UUIDBase, SQLAlchemyUserMixin):
     # on test suite init, thus messing with the UUIDBase metadata. `username` is required in the integration suite.
     username: Mapped[str] = mapped_column(Text(), unique=True)
     # relationships
-    roles: Mapped[List[Role]] = relationship(Role, secondary="user_role", lazy="selectin")
+    roles: Mapped[list[Role]] = relationship(Role, secondary="user_role", lazy="selectin")
 
 
 class UserRole(UUIDBase):

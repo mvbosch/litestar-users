@@ -1,7 +1,7 @@
 # Configuration
 
 Litestar Users enables you to set up pre-configured authentication and user management route handlers in minutes.
-The [LitestarUsers][litestar_users.main.LitestarUsers] accepts a config object in the form of [LitestarUsersConfig][litestar_users.config.LitestarUsersConfig]. The config requires [database models](./1-database-models.md), [DTOs](./2-data-transfer-objects.md), a [user service](./3-the-user-service.md) and one or more [route handler configs](./4-route-handler-configs.md).
+The `LitestarUsersPlugin` accepts a config object in the form of [LitestarUsersConfig][litestar_users.config.LitestarUsersConfig]. The config requires [database models](./1-database-models.md), [DTOs](./2-data-transfer-objects.md), a [user service](./3-the-user-service.md) and one or more [route handler configs](./4-route-handler-configs.md).
 
 
 ## Minimal example
@@ -66,6 +66,7 @@ class UserService(BaseUserService[User, Any]):  # type: ignore[type-var]
 sqlalchemy_config = SQLAlchemyAsyncConfig(
     connection_string=DATABASE_URL,
     session_dependency_key="session",
+    before_send_handler="autocommit",
 )
 
 litestar_users = LitestarUsersPlugin(
@@ -77,7 +78,6 @@ litestar_users = LitestarUsersPlugin(
         user_registration_dto=UserRegistrationDTO,
         user_update_dto=UserUpdateDTO,
         user_service_class=UserService,  # pyright: ignore
-        auto_commit_transactions=False,
         auth_handler_config=AuthHandlerConfig(),
         register_handler_config=RegisterHandlerConfig(),
         verification_handler_config=VerificationHandlerConfig(),
@@ -93,8 +93,13 @@ if __name__ == "__main__":
     uvicorn.run(app="basic:app", reload=True)
 ```
 
+!!! warning
+    It is recommended to set `SQLAlchemyAsyncConfig.before_send_handler` to `"autocommit"`, which will ensure that database transactions are atomically committed at the end of the request/response lifecycle if no errors are raised, else the transaction will be rolled back.
+
+    Alternatively, you could set [LitestarUsersConfig.auto_commit_transactions][litestar_users.config.LitestarUsersConfig.auto_commit_transactions] to `True`, however this method commits transactions immediately after invoking methods such as `UserService.register` etc. This can lead to undesired state where a user registers and is committed to the database, though an uncaught exception in the `post_registration_hook` causes an internal server error. This would lead the user to believe that the operation failed, though a second registration attempt would probably result in a duplicate registration error.
+
 !!! note
     Aside from the pre-configured public routes provided by Litestar-Users, *all* the routes on your application will require authentication unless specified otherwise in [LitestarUsersConfig.auth_exclude_paths][litestar_users.config.LitestarUsersConfig.auth_exclude_paths]
 
 !!! note
-    Litestar-Users requires the use of a corresponding `Litestar` [plugin](https://litestarproject.dev/lib/usage/plugins/index.html) for database management.
+    Litestar-Users requires the use of a corresponding `Litestar` [plugin](https://docs.litestar.dev/latest/usage/plugins/index.html) for database management.

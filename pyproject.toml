@@ -2,7 +2,7 @@
 name = "litestar-users"
 version = "1.6.0"
 description = "Authentication and user management for Litestar"
-authors = [{ name = "Michael Bosch", email = "michael@lonelyviking.com" }]
+authors = [{ name = "Michael Bosch", email = "michael@vonbosch.co.za" }]
 requires-python = "~=3.9"
 readme = "README.md"
 license = "MIT"
@@ -13,7 +13,7 @@ dependencies = [
     "argon2-cffi",
     "pyyaml!=5.4.*",
     "libpass>=1.8.1,<2",
-    "advanced-alchemy>=0.27.0",
+    "advanced-alchemy>=0.31.0",
 ]
 
 [dependency-groups]
@@ -69,7 +69,7 @@ strict-imports = false
 [tool.ruff]
 line-length = 120
 src = ["litestar_users", "tests", "examples"]
-target-version = "py38"
+target-version = "py39"
 
 [tool.ruff.lint]
 select = [

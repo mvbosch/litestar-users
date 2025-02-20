@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 
 def _get_user_repository(connection: ASGIConnection) -> SQLAlchemyUserRepository:
-    sqlalchemy_config = get_sqlalchemy_plugin(connection.app)._config
+    sqlalchemy_config = get_sqlalchemy_plugin(connection.app).config[0]
     if not isinstance(sqlalchemy_config, SQLAlchemyAsyncConfig):
         raise ImproperlyConfiguredException("SQLAlchemy config must be of type `SQLAlchemyAsyncConfig`")
     async_session = sqlalchemy_config.provide_session(state=connection.app.state, scope=connection.scope)

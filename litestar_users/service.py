@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any, Generic, Sequence, TypeVar
-from uuid import UUID
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from uuid import UUID, uuid4
 
 from advanced_alchemy.exceptions import IntegrityError, NotFoundError
 from jose import JWTError
@@ -18,6 +18,8 @@ __all__ = ["BaseUserService"]
 
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from advanced_alchemy.filters import StatementFilter
     from advanced_alchemy.repository import LoadSpec
     from advanced_alchemy.repository.typing import OrderingPair
@@ -281,8 +283,9 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT]):  # pylint: disable=R0904
         Args:
             email: Email of the user who has forgotten their password.
         """
-        user = await self.get_user_by(email=email)  # TODO: something about timing attacks.
+        user = await self.user_repository.get_one_or_none(func.lower(self.user_model.email) == email.lower())
         if user is None:
+            self.generate_token(uuid4(), aud="reset_password")
             return
         token = self.generate_token(user.id, aud="reset_password")
         await self.send_password_reset_token(user, token)
