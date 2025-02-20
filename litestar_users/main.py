@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from advanced_alchemy.exceptions import RepositoryError
@@ -31,6 +31,8 @@ __all__ = ["LitestarUsersPlugin"]
 
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from click import Group
     from litestar import Router
     from litestar.config.app import AppConfig

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from typing import TYPE_CHECKING, Any
 
 from advanced_alchemy.extensions.litestar.plugins import SQLAlchemyInitPlugin
 from litestar.exceptions import ImproperlyConfiguredException
