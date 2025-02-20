@@ -150,9 +150,7 @@ def get_auth_handler(
             request.clear_session()
             raise NotAuthorizedException(detail="login failed, invalid input")
 
-        sess = request.session.copy()
-        sess.update(user_id = user.id)
-        request.set_session(sess)  # TODO: move and make configurable
+        request.set_session({**request.session, "user_id": user.id})
         return cast(SQLAUserT, user)
 
     @post(
