@@ -1,8 +1,13 @@
 # Changelog
 
+[v1.6.1]
+
+- change password reset user lookups to be case-insensitive.
+- fix user-defined session data being overridden on the login route handler.
+
 [v1.6.0]
 
-- add python 3.13 support
+- add python 3.13 support.
 - fix autocommit not adhering to config for some methods.
 - add query options to user getter methods.
 - add load options to authentication lookup.
