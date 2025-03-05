@@ -11,7 +11,7 @@ repos:
       - id: mixed-line-ending
       - id: trailing-whitespace
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.9.6"
+    rev: "v0.9.9"
     hooks:
       - id: ruff
         args: [--fix]
@@ -72,14 +72,14 @@ repos:
             asyncpg,
             litestar,
             libpass,
+            pyjwt,
             pytest,
-            python-jose,
             sqlalchemy,
             types-click,
             uvicorn,
           ]
   - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.394
+    rev: v1.1.396
     hooks:
       - id: pyright
         exclude: "test_apps|tools"
@@ -89,8 +89,8 @@ repos:
             asyncpg,
             litestar,
             libpass,
+            pyjwt,
             pytest,
-            python-jose,
             pyyaml,
             sqlalchemy,
             types-click,
