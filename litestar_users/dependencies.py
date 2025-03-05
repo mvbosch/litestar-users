@@ -26,7 +26,7 @@ def provide_user_service(state: State, request: Request) -> BaseUserService:
         state: The application.state instance
     """
 
-    sqlalchemy_config = get_sqlalchemy_plugin(request.app)._config
+    sqlalchemy_config = get_sqlalchemy_plugin(request.app).config[0]
     if not isinstance(sqlalchemy_config, SQLAlchemyAsyncConfig):
         raise ImproperlyConfiguredException("SQLAlchemy config must be of type `SQLAlchemyAsyncConfig`")
     session = sqlalchemy_config.provide_session(state=state, scope=request.scope)

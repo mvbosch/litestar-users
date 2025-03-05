@@ -1,6 +1,6 @@
 [project]
 name = "litestar-users"
-version = "1.6.1"
+version = "1.6.2"
 description = "Authentication and user management for Litestar"
 authors = [{ name = "Michael Bosch", email = "michael@vonbosch.co.za" }]
 requires-python = "~=3.9"
@@ -8,12 +8,12 @@ readme = "README.md"
 license = "MIT"
 dependencies = [
     "litestar[jwt, cli, sqlalchemy]>=2.9.0,<3",
-    "python-jose",
     "cryptography",
     "argon2-cffi",
     "pyyaml!=5.4.*",
     "libpass>=1.8.1,<2",
     "advanced-alchemy>=0.31.0",
+    "pyjwt>=2.10.1",
 ]
 
 [dependency-groups]

@@ -5,8 +5,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from uuid import UUID, uuid4
 
 from advanced_alchemy.exceptions import IntegrityError, NotFoundError
-from jose import JWTError
-from litestar.exceptions import ImproperlyConfiguredException
+from litestar.exceptions import ImproperlyConfiguredException, NotAuthorizedException
 from litestar.security.jwt.token import Token
 from sqlalchemy import func
 
@@ -407,7 +406,7 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT]):  # pylint: disable=R0904
                 secret=self.secret,
                 algorithm="HS256",
             )
-        except JWTError as e:
+        except NotAuthorizedException as e:
             raise InvalidTokenException from e
 
         if token.aud != context:
