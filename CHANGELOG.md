@@ -1,5 +1,9 @@
 # Changelog
 
+[v1.6.2]
+
+- fix sqlalchemy session retrieval in `provide_user_service`
+
 [v1.6.1]
 
 - change password reset user lookups to be case-insensitive.
