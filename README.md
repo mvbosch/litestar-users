@@ -21,6 +21,6 @@ Effortlessly add secure authentication to your [Litestar](https://litestar.dev/)
 
 ### Documentation
 
-[Read the documentation](https://lonelyvikingmichael.github.io/litestar-users/)
+[Read the documentation](https://mvbosch.github.io/litestar-users/)
 
-Otherwise [check out the examples](https://github.com/LonelyVikingMichael/litestar-users/tree/main/examples)
+Otherwise [check out the examples](https://github.com/mvbosch/litestar-users/tree/main/examples)
