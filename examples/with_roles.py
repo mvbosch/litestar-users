@@ -28,7 +28,7 @@ from litestar_users.guards import roles_accepted, roles_required
 from litestar_users.service import BaseUserService
 
 ENCODING_SECRET = "1234567890abcdef"  # noqa: S105
-DATABASE_URL = "sqlite+aiosqlite:///"
+DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 UUIDBase.metadata.clear()
 
 user_role = Table(
