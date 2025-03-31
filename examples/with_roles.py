@@ -26,12 +26,10 @@ from litestar_users.config import (
     VerificationHandlerConfig,
 )
 from litestar_users.guards import roles_accepted, roles_required
-from litestar_users.password import PasswordManager
 from litestar_users.service import BaseUserService
 
 ENCODING_SECRET = "1234567890abcdef"  # noqa: S105
 DATABASE_URL = "sqlite+aiosqlite:///"
-password_manager = PasswordManager()
 UUIDBase.metadata.clear()
 
 
