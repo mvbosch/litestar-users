@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any
 
 from litestar.testing import TestClient
 
-if TYPE_CHECKING:
-    from tests.integration.conftest import User
 
-
-def test_verification(client: TestClient, unverified_user: User, unverified_user_token: str) -> None:
+def test_verification(client: TestClient, unverified_user: Any, unverified_user_token: str) -> None:
     response = client.post("/verify", params={"token": unverified_user_token})
     assert response.status_code == 201
     response_body = response.json()

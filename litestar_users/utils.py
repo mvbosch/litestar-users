@@ -52,7 +52,7 @@ async def async_session(app: Litestar) -> AsyncIterator[AsyncSession]:
         yield session
 
 
-def get_user_service(app: Litestar, session: AsyncSession) -> BaseUserService[Any, Any]:
+def get_user_service(app: Litestar, session: AsyncSession) -> BaseUserService[Any, Any, Any]:
     """Get a `UserService` instance outside of a Litestar request context."""
 
     config = get_litestar_users_plugin(app)._config

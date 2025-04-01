@@ -3,10 +3,12 @@ from __future__ import annotations
 from typing import TypeVar
 
 from sqlalchemy.orm import Mapped, declarative_mixin, mapped_column
-from sqlalchemy.sql.sqltypes import Boolean, String
+from sqlalchemy.sql.sqltypes import Boolean, Integer, String
 
 __all__ = [
+    "OAuthAccountModelType",
     "RoleModelType",
+    "SQLAlchemyOAuthAccountMixin",
     "SQLAlchemyRoleMixin",
     "SQLAlchemyUserMixin",
     "UserModelType",
@@ -31,5 +33,19 @@ class SQLAlchemyRoleMixin:
     description: Mapped[str] = mapped_column(String(255), nullable=True)
 
 
+@declarative_mixin
+class SQLAlchemyOAuthAccountMixin:
+    """Base SQLAlchemy oauth account mixin."""
+
+    user_id: Mapped[int] = mapped_column(Integer(), nullable=False)
+    oauth_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    access_token: Mapped[str] = mapped_column(String(255), nullable=False)
+    account_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    account_email: Mapped[str] = mapped_column(String(255), nullable=False)
+    expires_at: Mapped[int] = mapped_column(Integer(), nullable=True)
+    refresh_token: Mapped[str] = mapped_column(String(255), nullable=True)
+
+
 UserModelType = TypeVar("UserModelType", bound=SQLAlchemyUserMixin)
 RoleModelType = TypeVar("RoleModelType", bound=SQLAlchemyRoleMixin)
+OAuthAccountModelType = TypeVar("OAuthAccountModelType", bound=SQLAlchemyOAuthAccountMixin)

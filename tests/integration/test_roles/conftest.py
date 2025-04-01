@@ -1,6 +1,6 @@
 from collections.abc import AsyncIterator, Generator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import pytest
@@ -29,71 +29,79 @@ from tests.utils import MockAuth
 if TYPE_CHECKING:
     from litestar.testing import TestClient
 
-UUIDBase.metadata.clear()
+
+@pytest.fixture(scope="session")
+def models() -> Generator[dict[str, Any], None, None]:
+    UUIDBase.metadata.clear()
+
+    class Role(UUIDBase, SQLAlchemyRoleMixin):
+        pass
+
+    class User(UUIDBase, SQLAlchemyUserMixin):
+        # data columns
+        # username is only added here because of a rubbish race condition where all `conftest.py` modules are loaded
+        # on test suite init, thus messing with the UUIDBase metadata. `username` is required in the integration suite.
+        username: Mapped[str] = mapped_column(Text(), unique=True)
+        # relationships
+        roles: Mapped[list[Role]] = relationship(Role, secondary="user_role", lazy="selectin")
+
+    class UserRole(UUIDBase):
+        user_id = mapped_column(Uuid(), ForeignKey("user.id"))
+        role_id = mapped_column(Uuid(), ForeignKey("role.id"))
+
+    class RoleReadDTO(SQLAlchemyDTO[Role]):
+        """Role read DTO."""
+
+    class RoleCreateDTO(SQLAlchemyDTO[Role]):
+        """Role creation DTO."""
+
+        config = SQLAlchemyDTOConfig(exclude={"id"})
+
+    class RoleUpdateDTO(SQLAlchemyDTO[Role]):
+        """Role update DTO."""
+
+        config = SQLAlchemyDTOConfig(exclude={"id"}, partial=True)
+
+    @dataclass
+    class UserRegistrationSchema:
+        email: str
+        username: str
+        password: str
+
+    class UserRegistrationDTO(DataclassDTO[UserRegistrationSchema]):
+        """User registration DTO."""
+
+    class UserReadDTO(SQLAlchemyDTO[User]):
+        config = SQLAlchemyDTOConfig(exclude={"password", "password_hash"})
+
+    class UserUpdateDTO(SQLAlchemyDTO[User]):
+        """User update DTO."""
+
+        config = SQLAlchemyDTOConfig(exclude={"id", "password", "password_hash", "roles"}, partial=True)
+
+    _models = {
+        "Role": Role,
+        "User": User,
+        "UserRole": UserRole,
+        "RoleReadDTO": RoleReadDTO,
+        "RoleCreateDTO": RoleCreateDTO,
+        "RoleUpdateDTO": RoleUpdateDTO,
+        "UserRegistrationSchema": UserRegistrationSchema,
+        "UserRegistrationDTO": UserRegistrationDTO,
+        "UserReadDTO": UserReadDTO,
+        "UserUpdateDTO": UserUpdateDTO,
+    }
+    yield _models
+    UUIDBase.metadata.clear()
 
 
-class Role(UUIDBase, SQLAlchemyRoleMixin):
-    pass
-
-
-class User(UUIDBase, SQLAlchemyUserMixin):
-    # data columns
-    # username is only added here because of a rubbish race condition where all `conftest.py` modules are loaded
-    # on test suite init, thus messing with the UUIDBase metadata. `username` is required in the integration suite.
-    username: Mapped[str] = mapped_column(Text(), unique=True)
-    # relationships
-    roles: Mapped[list[Role]] = relationship(Role, secondary="user_role", lazy="selectin")
-
-
-class UserRole(UUIDBase):
-    user_id = mapped_column(Uuid(), ForeignKey("user.id"))
-    role_id = mapped_column(Uuid(), ForeignKey("role.id"))
-
-
-class RoleReadDTO(SQLAlchemyDTO[Role]):
-    """Role read DTO."""
-
-
-class RoleCreateDTO(SQLAlchemyDTO[Role]):
-    """Role creation DTO."""
-
-    config = SQLAlchemyDTOConfig(exclude={"id"})
-
-
-class RoleUpdateDTO(SQLAlchemyDTO[Role]):
-    """Role update DTO."""
-
-    config = SQLAlchemyDTOConfig(exclude={"id"}, partial=True)
-
-
-@dataclass
-class UserRegistrationSchema:
-    email: str
-    username: str
-    password: str
-
-
-class UserRegistrationDTO(DataclassDTO[UserRegistrationSchema]):
-    """User registration DTO."""
-
-
-class UserReadDTO(SQLAlchemyDTO[User]):
-    config = SQLAlchemyDTOConfig(exclude={"password", "password_hash"})
-
-
-class UserUpdateDTO(SQLAlchemyDTO[User]):
-    """User update DTO."""
-
-    config = SQLAlchemyDTOConfig(exclude={"id", "password", "password_hash", "roles"}, partial=True)
-
-
-class UserService(BaseUserService[User, Role]):  # type: ignore[type-var]
+class UserService(BaseUserService[Any, Any, Any]):
     pass
 
 
 @pytest.fixture()
-def admin_role() -> Role:
-    return Role(
+def admin_role(models: dict[str, Any]) -> Any:
+    return models["Role"](
         id=UUID("9b62b52c-4278-4124-aca8-783ab281c196"),
         name="administrator",
         description="X",
@@ -101,8 +109,8 @@ def admin_role() -> Role:
 
 
 @pytest.fixture()
-def writer_role() -> Role:
-    return Role(
+def writer_role(models: dict[str, Any]) -> Any:
+    return models["Role"](
         id=UUID("76ddde3c-91d0-4b58-baa4-bfc4b3892ab2"),
         name="writer",
         description="He who writes",
@@ -110,8 +118,8 @@ def writer_role() -> Role:
 
 
 @pytest.fixture()
-def admin_user(admin_role: Role) -> User:
-    return User(
+def admin_user(admin_role: Any, models: dict[str, Any]) -> Any:
+    return models["User"](
         id=UUID("01676112-d644-4f93-ab32-562850e89549"),
         email="admin@example.com",
         password_hash=password_manager.hash("iamsuperadmin"),
@@ -123,8 +131,8 @@ def admin_user(admin_role: Role) -> User:
 
 
 @pytest.fixture()
-def generic_user() -> User:
-    return User(
+def generic_user(models: dict[str, Any]) -> Any:
+    return models["User"](
         id=UUID("555d9ddb-7033-4819-a983-e817237b88e5"),
         email="good@example.com",
         password_hash=password_manager.hash("justauser"),
@@ -142,19 +150,19 @@ def generic_user() -> User:
         pytest.param(JWTCookieAuth, id="jwt_cookie"),
     ],
 )
-def litestar_users_config(request: pytest.FixtureRequest) -> LitestarUsersConfig:
+def litestar_users_config(request: pytest.FixtureRequest, models: dict[str, Any]) -> LitestarUsersConfig:
     return LitestarUsersConfig(  # pyright: ignore
         auth_backend_class=request.param,
         session_backend_config=ServerSideSessionConfig(),
         secret=ENCODING_SECRET,
-        user_model=User,  # pyright: ignore
-        user_read_dto=UserReadDTO,
-        user_registration_dto=UserRegistrationDTO,
-        user_update_dto=UserUpdateDTO,
-        role_model=Role,  # pyright: ignore
-        role_create_dto=RoleCreateDTO,
-        role_read_dto=RoleReadDTO,
-        role_update_dto=RoleUpdateDTO,
+        user_model=models["User"],  # pyright: ignore
+        user_read_dto=models["UserReadDTO"],
+        user_registration_dto=models["UserRegistrationDTO"],
+        user_update_dto=models["UserUpdateDTO"],
+        role_model=models["Role"],  # pyright: ignore
+        role_create_dto=models["RoleCreateDTO"],
+        role_read_dto=models["RoleReadDTO"],
+        role_update_dto=models["RoleUpdateDTO"],
         user_service_class=UserService,
         role_management_handler_config=RoleManagementHandlerConfig(
             guards=[roles_accepted("administrator"), roles_required("administrator")]
@@ -168,13 +176,13 @@ def mock_auth(client: "TestClient", litestar_users_config: LitestarUsersConfig) 
 
 
 @pytest.fixture()
-def authenticate_admin(mock_auth: MockAuth, admin_user: User) -> "Generator":
+def authenticate_admin(mock_auth: MockAuth, admin_user: Any) -> "Generator":
     mock_auth.authenticate(admin_user.id)
     yield
 
 
 @pytest.fixture()
-def authenticate_generic(mock_auth: MockAuth, generic_user: User) -> "Generator":
+def authenticate_generic(mock_auth: MockAuth, generic_user: Any) -> "Generator":
     mock_auth.authenticate(generic_user.id)
     yield
 
@@ -183,10 +191,11 @@ def authenticate_generic(mock_auth: MockAuth, generic_user: User) -> "Generator"
 async def _seed_db(
     engine: AsyncEngine,
     sessionmaker: async_sessionmaker[AsyncSession],
-    admin_user: User,
-    generic_user: User,
-    admin_role: Role,
-    writer_role: Role,
+    admin_user: Any,
+    generic_user: Any,
+    admin_role: Any,
+    writer_role: Any,
+    models: dict[str, Any],
 ) -> "AsyncIterator[None]":
     """Populate test database with.
 
@@ -196,11 +205,12 @@ async def _seed_db(
         raw_users: Test users to add to the database
     """
 
-    metadata = User.metadata
+    metadata = models["User"].metadata
     async with engine.begin() as conn:
-        await conn.run_sync(metadata.drop_all)
         await conn.run_sync(metadata.create_all)
     async with sessionmaker() as session:
         session.add_all([admin_user, generic_user, admin_role, writer_role])
         await session.commit()
     yield
+    async with engine.begin() as conn:
+        await conn.run_sync(metadata.drop_all)

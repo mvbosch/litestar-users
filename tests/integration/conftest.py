@@ -46,7 +46,6 @@ from tests.utils import MockAuth, basic_guard
 if TYPE_CHECKING:
     from collections import abc
 
-UUIDBase.metadata.clear()
 password_manager = PasswordManager(hash_schemes=HASH_SCHEMES)
 here = Path(__file__).parent
 
@@ -66,48 +65,56 @@ def event_loop() -> "abc.Iterator[asyncio.AbstractEventLoop]":
         loop.close()
 
 
-class User(UUIDBase, SQLAlchemyUserMixin):
-    username: Mapped[str] = mapped_column(Text(), unique=True)
+@pytest.fixture(scope="session")
+def models() -> Generator[dict[str, Any], None, None]:
+    UUIDBase.metadata.clear()
+
+    class User(UUIDBase, SQLAlchemyUserMixin):
+        username: Mapped[str] = mapped_column(Text(), unique=True)
+
+    @dataclass
+    class UserRegistration:
+        email: str
+        username: str
+        password: str
+
+    @dataclass
+    class CustomAuthenticationSchema:
+        username: str
+        password: str
+
+    class UserRegistrationDTO(DataclassDTO[UserRegistration]):
+        """User registration DTO."""
+
+    class UserReadDTO(SQLAlchemyDTO[User]):
+        """User read DTO."""
+
+        config = SQLAlchemyDTOConfig(exclude={"password_hash"})
+
+    class UserUpdateDTO(SQLAlchemyDTO[User]):
+        """User update DTO."""
+
+        config = SQLAlchemyDTOConfig(exclude={"id", "email"}, rename_fields={"password_hash": "password"}, partial=True)
+
+    _models = {
+        "User": User,
+        "UserRegistration": UserRegistration,
+        "CustomAuthenticationSchema": CustomAuthenticationSchema,
+        "UserRegistrationDTO": UserRegistrationDTO,
+        "UserReadDTO": UserReadDTO,
+        "UserUpdateDTO": UserUpdateDTO,
+    }
+    yield _models
+    UUIDBase.metadata.clear()
 
 
-@dataclass
-class UserRegistration:
-    email: str
-    username: str
-    password: str
-
-
-@dataclass
-class CustomAuthenticationSchema:
-    username: str
-    password: str
-
-
-class UserRegistrationDTO(DataclassDTO[UserRegistration]):
-    """User registration DTO."""
-
-
-class UserReadDTO(SQLAlchemyDTO[User]):
-    """User read DTO."""
-
-    config = SQLAlchemyDTOConfig(exclude={"password_hash"})
-
-
-class UserUpdateDTO(SQLAlchemyDTO[User]):
-    """User update DTO."""
-
-    config = SQLAlchemyDTOConfig(
-        exclude={"id", "roles", "email"}, rename_fields={"password_hash": "password"}, partial=True
-    )
-
-
-class UserService(BaseUserService[User, Any]):  # type: ignore[type-var]
+class UserService(BaseUserService[Any, Any, Any]):
     pass
 
 
 @pytest.fixture()
-def admin_user() -> User:
-    return User(
+def admin_user(models: dict[str, Any]) -> Any:
+    return models["User"](
         id=UUID("01676112-d644-4f93-ab32-562850e89549"),
         username="the_admin",
         email="admin@example.com",
@@ -118,8 +125,8 @@ def admin_user() -> User:
 
 
 @pytest.fixture()
-def generic_user() -> User:
-    return User(
+def generic_user(models: dict[str, Any]) -> Any:
+    return models["User"](
         id=UUID("555d9ddb-7033-4819-a983-e817237b88e5"),
         email="good@example.com",
         username="just_me",
@@ -130,7 +137,7 @@ def generic_user() -> User:
 
 
 @pytest.fixture()
-def generic_user_password_reset_token(generic_user: User) -> str:
+def generic_user_password_reset_token(generic_user: Any) -> str:
     token = Token(
         exp=datetime.now() + timedelta(seconds=60 * 60 * 24),
         sub=str(generic_user.id),
@@ -140,8 +147,8 @@ def generic_user_password_reset_token(generic_user: User) -> str:
 
 
 @pytest.fixture()
-def unverified_user() -> User:
-    return User(
+def unverified_user(models: dict[str, Any]) -> Any:
+    return models["User"](
         id=UUID("68dec058-b752-42eb-8e55-b94a7b275f99"),
         email="unverified@example.com",
         username="unverified",
@@ -152,7 +159,7 @@ def unverified_user() -> User:
 
 
 @pytest.fixture()
-def unverified_user_token(unverified_user: User) -> str:
+def unverified_user_token(unverified_user: Any) -> str:
     token = Token(
         exp=datetime.now() + timedelta(seconds=60 * 60 * 24),
         sub=str(unverified_user.id),
@@ -182,17 +189,17 @@ def sqlalchemy_plugin(sqlalchemy_plugin_config: SQLAlchemyAsyncConfig) -> SQLAlc
         pytest.param(JWTCookieAuth, id="jwt_cookie"),
     ],
 )
-def litestar_users_config(request: pytest.FixtureRequest) -> LitestarUsersConfig:
+def litestar_users_config(request: pytest.FixtureRequest, models: dict[str, Any]) -> LitestarUsersConfig:
     return LitestarUsersConfig(  # pyright: ignore
         auth_backend_class=request.param,
-        authentication_request_schema=CustomAuthenticationSchema,
+        authentication_request_schema=models["CustomAuthenticationSchema"],
         user_auth_identifier="username",
         session_backend_config=ServerSideSessionConfig(),
         secret=ENCODING_SECRET,
-        user_model=User,  # pyright: ignore
-        user_registration_dto=UserRegistrationDTO,
-        user_read_dto=UserReadDTO,
-        user_update_dto=UserUpdateDTO,
+        user_model=models["User"],  # pyright: ignore
+        user_registration_dto=models["UserRegistrationDTO"],
+        user_read_dto=models["UserReadDTO"],
+        user_update_dto=models["UserUpdateDTO"],
         user_service_class=UserService,
         require_verification_on_registration=True,
         auth_handler_config=AuthHandlerConfig(),
@@ -235,13 +242,13 @@ def mock_auth(client: TestClient, litestar_users_config: LitestarUsersConfig) ->
 
 
 @pytest.fixture()
-def authenticate_admin(mock_auth: MockAuth, admin_user: User) -> Generator:
+def authenticate_admin(mock_auth: MockAuth, admin_user: Any) -> Generator:
     mock_auth.authenticate(admin_user.id)
     yield
 
 
 @pytest.fixture()
-def authenticate_generic(mock_auth: MockAuth, generic_user: User) -> Generator:
+def authenticate_generic(mock_auth: MockAuth, generic_user: Any) -> Generator:
     mock_auth.authenticate(generic_user.id)
     yield
 
@@ -295,9 +302,10 @@ def session(sessionmaker: async_sessionmaker[AsyncSession]) -> AsyncSession:
 async def _seed_db(
     engine: AsyncEngine,
     sessionmaker: async_sessionmaker[AsyncSession],
-    admin_user: User,
-    generic_user: User,
-    unverified_user: User,
+    admin_user: Any,
+    generic_user: Any,
+    unverified_user: Any,
+    models: dict[str, Any],
 ) -> "AsyncIterator[None]":
     """Populate test database with.
 
@@ -307,11 +315,12 @@ async def _seed_db(
         raw_users: Test users to add to the database
     """
 
-    metadata = User.metadata
+    metadata = models["User"].metadata
     async with engine.begin() as conn:
-        await conn.run_sync(metadata.drop_all)
         await conn.run_sync(metadata.create_all)
     async with sessionmaker() as session:
         session.add_all([admin_user, generic_user, unverified_user])
         await session.commit()
     yield
+    async with engine.begin() as conn:
+        await conn.run_sync(metadata.drop_all)

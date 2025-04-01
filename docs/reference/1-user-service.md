@@ -30,3 +30,6 @@
             - delete_role
             - assign_role
             - revoke_role
+            - get_by_oauth_account
+            - oauth2_authorize
+            - oauth2_callback

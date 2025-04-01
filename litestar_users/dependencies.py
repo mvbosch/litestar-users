@@ -5,7 +5,10 @@ from typing import TYPE_CHECKING
 from advanced_alchemy.extensions.litestar.plugins import SQLAlchemyAsyncConfig
 from litestar.exceptions import ImproperlyConfiguredException
 
-from litestar_users.adapter.sqlalchemy.repository import SQLAlchemyRoleRepository
+from litestar_users.adapter.sqlalchemy.repository import (
+    SQLAlchemyOAuthAccountRepository,
+    SQLAlchemyRoleRepository,
+)
 from litestar_users.utils import get_litestar_users_plugin, get_sqlalchemy_plugin
 
 __all__ = ["provide_user_service"]
@@ -46,11 +49,21 @@ def provide_user_service(state: State, request: Request) -> BaseUserService:
             auto_commit=litestar_users_config.auto_commit_transactions,
         )
     )
+    oauth2_repository: SQLAlchemyOAuthAccountRepository | None = (
+        None
+        if litestar_users_config.oauth_account_model is None
+        else SQLAlchemyOAuthAccountRepository(
+            session=session,
+            model_type=litestar_users_config.oauth_account_model,
+            auto_commit=litestar_users_config.auto_commit_transactions,
+        )
+    )
 
     return litestar_users_config.user_service_class(
         user_auth_identifier=litestar_users_config.user_auth_identifier,
         user_repository=user_repository,
         role_repository=role_repository,
+        oauth2_repository=oauth2_repository,
         secret=litestar_users_config.secret,
         hash_schemes=litestar_users_config.hash_schemes,
         require_verification_on_registration=litestar_users_config.require_verification_on_registration,

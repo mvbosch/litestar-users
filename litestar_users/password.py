@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 from typing import TYPE_CHECKING, cast
 
 from passlib.context import CryptContext
@@ -23,6 +24,14 @@ class PasswordManager:
         if hash_schemes is None:
             hash_schemes = ["argon2"]
         self.context = CryptContext(schemes=hash_schemes, deprecated="auto")
+
+    def generate(self) -> str:
+        """Generate a random password.
+
+        Returns:
+            A random password.
+        """
+        return secrets.token_urlsafe(16)
 
     def hash(self, password: str) -> str:
         """Create a password hash.

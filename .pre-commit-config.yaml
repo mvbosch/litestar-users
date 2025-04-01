@@ -20,7 +20,7 @@ repos:
     rev: v2.4.1
     hooks:
       - id: codespell
-        exclude: "tests/integration/test_roles/conftest|examples/with_roles|docs/usage/1-database-models"
+        exclude: "tests/integration/test_roles/conftest|tests/integration/test_oauth/conftest|examples/with_roles|examples/with_oauth2|docs/usage/1-database-models"
   - repo: https://github.com/asottile/blacken-docs
     rev: 1.19.1
     hooks:
@@ -74,9 +74,11 @@ repos:
             libpass,
             pyjwt,
             pytest,
+            pytest_mock,
             sqlalchemy,
             types-click,
             uvicorn,
+            httpx-oauth,
           ]
   - repo: https://github.com/RobertCraigie/pyright-python
     rev: v1.1.396
@@ -91,8 +93,10 @@ repos:
             libpass,
             pyjwt,
             pytest,
+            pytest_mock,
             pyyaml,
             sqlalchemy,
             types-click,
             uvicorn,
+            httpx-oauth,
           ]

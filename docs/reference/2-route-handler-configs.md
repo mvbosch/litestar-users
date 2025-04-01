@@ -47,3 +47,14 @@
         members:
             - path
             - tags
+
+::: litestar_users.config.OAuth2HandlerConfig
+    options:
+        members:
+            - oauth_client
+            - state_secret
+            - path
+            - tags
+            - redirect_url
+            - associate_by_email
+            - is_verified_by_default

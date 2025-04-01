@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 from uuid import UUID  # noqa: TC003
 
 import uvicorn
@@ -84,7 +85,7 @@ class UserUpdateDTO(SQLAlchemyDTO[User]):
     # we'll update `login_count` in the UserService.post_login_hook
 
 
-class UserService(BaseUserService[User, Role]):  # type: ignore[type-var]
+class UserService(BaseUserService[User, Role, Any]):  # type: ignore[type-var]
     async def post_login_hook(self, user: User, request: Request | None = None) -> None:
         # This will properly increment the user's `login_count`
         user.login_count += 1  # pyright: ignore

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import ANY
 
 import pytest
@@ -10,8 +10,6 @@ from litestar_users.main import LitestarUsersPlugin
 if TYPE_CHECKING:
     from litestar import Litestar
     from litestar.testing import TestClient
-
-    from tests.integration.conftest import User
 
 
 class TestRegistration:
@@ -46,7 +44,7 @@ class TestRegistration:
             "is_verified": True,
         }
 
-    def test_unique_identifier(self, client: TestClient, generic_user: User) -> None:
+    def test_unique_identifier(self, client: TestClient, generic_user: Any) -> None:
         response = client.post(
             "/register", json={"email": "some@one.com", "username": generic_user.username, "password": "copycat"}
         )
