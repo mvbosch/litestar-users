@@ -38,6 +38,7 @@ user_role = Table(
     Column("role_id", ForeignKey("role.id", ondelete="CASCADE"), primary_key=True),
 )
 
+
 class Role(UUIDBase, SQLAlchemyRoleMixin):
     pass
 
