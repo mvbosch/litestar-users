@@ -20,6 +20,11 @@ from litestar_users.dependencies import provide_user_service
 from litestar_users.dtos import OAuthAuthorizeDTO
 from litestar_users.schema import OAuth2AuthorizeSchema
 
+try:
+    from httpx_oauth.oauth2 import BaseOAuth2
+except ModuleNotFoundError:
+    BaseOAuth2 = Any  # type: ignore[assignment,misc]
+
 __all__ = [
     "get_auth_handler",
     "get_current_user_handler",
@@ -30,12 +35,10 @@ __all__ = [
     "get_verification_handler",
 ]
 
-
 if TYPE_CHECKING:
     from uuid import UUID
 
     from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO
-    from httpx_oauth.oauth2 import BaseOAuth2
     from litestar.contrib.pydantic import PydanticDTO
     from litestar.dto import DataclassDTO, DTOData, MsgspecDTO
     from litestar.handlers import HTTPRouteHandler
@@ -82,7 +85,7 @@ def get_registration_handler(
 
 def get_oauth2_handler(
     path: str,
-    oauth_client: BaseOAuth2,
+    oauth_client: BaseOAuth2,  # pyright: ignore
     user_read_dto: type[SQLAlchemyDTO],  # pyright: ignore
     auth_backend: JWTAuth | JWTCookieAuth | SessionAuth,
     state_secret: str,
@@ -184,7 +187,7 @@ def get_oauth2_handler(
 
 def get_oauth2_associate_handler(
     path: str,
-    oauth_client: BaseOAuth2,
+    oauth_client: BaseOAuth2,  # pyright: ignore
     user_read_dto: type[SQLAlchemyDTO],  # pyright: ignore
     auth_backend: JWTAuth | JWTCookieAuth | SessionAuth,
     state_secret: str,

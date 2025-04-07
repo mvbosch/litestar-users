@@ -17,6 +17,11 @@ from litestar_users.jwt import decode_jwt, generate_jwt
 from litestar_users.password import PasswordManager
 from litestar_users.schema import OAuth2AuthorizeSchema
 
+try:
+    from httpx_oauth.oauth2 import BaseOAuth2
+except ModuleNotFoundError:
+    BaseOAuth2 = Any  # type: ignore[assignment,misc]
+
 __all__ = ["BaseUserService"]
 
 
@@ -26,7 +31,6 @@ if TYPE_CHECKING:
     from advanced_alchemy.filters import StatementFilter
     from advanced_alchemy.repository import LoadSpec
     from advanced_alchemy.repository.typing import OrderingPair
-    from httpx_oauth.oauth2 import BaseOAuth2
     from litestar import Request
     from sqlalchemy.sql import ColumnElement
 
@@ -650,7 +654,7 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
     async def oauth2_authorize(
         self,
         request: Request,
-        oauth_client: BaseOAuth2,
+        oauth_client: BaseOAuth2,  # pyright: ignore
         state_secret: str,
         callback_route_name: str,
         scopes: list[str] | None = None,
@@ -674,7 +678,7 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
     async def oauth2_callback(
         self,
         data: dict[str, Any],
-        oauth_client: BaseOAuth2,
+        oauth_client: BaseOAuth2,  # pyright: ignore
         state_secret: str,
         callback_route_name: str,
         request: Request,
