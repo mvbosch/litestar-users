@@ -19,6 +19,10 @@ Effortlessly add secure authentication to your [Litestar](https://litestar.dev/)
 
 `pip install litestar-users`
 
+or with OAuth2 support:
+
+`pip install litestar-users[oauth2]`
+
 ### Documentation
 
 [Read the documentation](https://mvbosch.github.io/litestar-users/)

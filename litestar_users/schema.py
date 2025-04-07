@@ -38,3 +38,10 @@ class UserRoleSchema:
 
     user_id: UUID
     role_id: UUID
+
+
+@dataclass
+class OAuth2AuthorizeSchema:
+    """OAuth2 authorize schema."""
+
+    authorization_url: str

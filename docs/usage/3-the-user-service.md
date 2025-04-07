@@ -21,7 +21,7 @@ from local.models import User
 from local.services import EmailService
 
 
-class UserService(BaseUserService[User, Any]):
+class UserService(BaseUserService[User, Any, Any]):
     async def send_verification_token(self, user: User, token: str) -> None:
         email_service = EmailService()
         email_service.send(

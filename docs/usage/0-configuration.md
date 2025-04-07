@@ -58,7 +58,7 @@ class UserUpdateDTO(SQLAlchemyDTO[User]):
     config = SQLAlchemyDTOConfig(exclude={"password_hash"}, partial=True)
 
 
-class UserService(BaseUserService[User, Any]):  # type: ignore[type-var]
+class UserService(BaseUserService[User, Any, Any]):  # type: ignore[type-var]
     async def post_registration_hook(self, user: User) -> None:
         print(f"User <{user.email}> has registered!")
 

@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any
 
 from litestar.security.session_auth import SessionAuth
 from litestar.testing import TestClient
 
 from litestar_users import LitestarUsersConfig
-
-if TYPE_CHECKING:
-    from tests.integration.conftest import User
 
 
 def test_login(client: TestClient) -> None:
@@ -24,7 +21,7 @@ def test_case_insensitive_login(client: TestClient) -> None:
     assert response.status_code == 201
 
 
-def test_logout(client: TestClient, generic_user: User, litestar_users_config: LitestarUsersConfig) -> None:
+def test_logout(client: TestClient, generic_user: Any, litestar_users_config: LitestarUsersConfig) -> None:
     client.set_session_data({"user_id": str(generic_user.id)})
     response = client.post("/logout")
     if litestar_users_config.auth_backend_class != SessionAuth:

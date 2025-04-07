@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 from uuid import UUID, uuid4
 
 from advanced_alchemy.exceptions import IntegrityError, NotFoundError
-from litestar.exceptions import ImproperlyConfiguredException, NotAuthorizedException
+from litestar import status_codes
+from litestar.exceptions import HTTPException, ImproperlyConfiguredException, NotAuthorizedException
 from litestar.security.jwt.token import Token
 from sqlalchemy import func
 
-from litestar_users.adapter.sqlalchemy.protocols import SQLARoleT, SQLAUserT
+import jwt
+from litestar_users.adapter.sqlalchemy.protocols import SQLAOAuthAccountT, SQLARoleT, SQLAUserT
 from litestar_users.exceptions import InvalidTokenException
+from litestar_users.jwt import decode_jwt, generate_jwt
 from litestar_users.password import PasswordManager
+from litestar_users.schema import OAuth2AuthorizeSchema
 
 __all__ = ["BaseUserService"]
 
@@ -22,14 +26,27 @@ if TYPE_CHECKING:
     from advanced_alchemy.filters import StatementFilter
     from advanced_alchemy.repository import LoadSpec
     from advanced_alchemy.repository.typing import OrderingPair
+    from httpx_oauth.oauth2 import BaseOAuth2
     from litestar import Request
     from sqlalchemy.sql import ColumnElement
 
-    from litestar_users.adapter.sqlalchemy.repository import SQLAlchemyRoleRepository, SQLAlchemyUserRepository
+    from litestar_users.adapter.sqlalchemy.repository import (
+        SQLAlchemyOAuthAccountRepository,
+        SQLAlchemyRoleRepository,
+        SQLAlchemyUserRepository,
+    )
     from litestar_users.schema import AuthenticationSchema
 
 
-class BaseUserService(Generic[SQLAUserT, SQLARoleT]):  # pylint: disable=R0904
+STATE_TOKEN_AUDIENCE = "litestar-users:oauth2-state"  # noqa: S105
+
+
+def generate_state_token(data: dict[str, str], secret: str, lifetime_seconds: int = 3600) -> str:
+    data["aud"] = STATE_TOKEN_AUDIENCE
+    return generate_jwt(data, secret, lifetime_seconds)
+
+
+class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pylint: disable=R0904
     """Main user management interface."""
 
     user_model: type[SQLAUserT]
@@ -42,6 +59,7 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT]):  # pylint: disable=R0904
         user_repository: SQLAlchemyUserRepository[SQLAUserT],
         hash_schemes: Sequence[str] | None = None,
         role_repository: SQLAlchemyRoleRepository[SQLARoleT, SQLAUserT] | None = None,
+        oauth2_repository: SQLAlchemyOAuthAccountRepository[SQLAOAuthAccountT, SQLAUserT] | None = None,
         require_verification_on_registration: bool = True,
     ) -> None:
         """User service constructor.
@@ -52,15 +70,19 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT]):  # pylint: disable=R0904
             user_repository: A `UserRepository` instance.
             hash_schemes: Schemes to use for password encryption.
             role_repository: A `RoleRepository` instance.
+            oauth2_repository: A `OAuth2Repository` instance.
             require_verification_on_registration: Whether the registration of a new user requires verification.
         """
         self.user_repository = user_repository
         self.role_repository = role_repository
+        self.oauth2_repository = oauth2_repository
         self.secret = secret
         self.password_manager = PasswordManager(hash_schemes=hash_schemes)
         self.user_model = self.user_repository.model_type
         if role_repository is not None:
             self.role_model = role_repository.model_type
+        if oauth2_repository is not None:
+            self.oauth2_model = oauth2_repository.model_type
         self.user_auth_identifier = user_auth_identifier
         self.require_verification_on_registration = require_verification_on_registration
 
@@ -523,6 +545,220 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT]):  # pylint: disable=R0904
         if isinstance(user.roles, list) and role not in user.roles:  # pyright: ignore
             raise IntegrityError(f"user does not have role '{role.name}'")
         return await self.role_repository.revoke_role(user, role)
+
+    async def get_by_oauth_account(self, oauth: str, account_id: str, request: Request | None = None) -> SQLAUserT:
+        """Get a user by OAuth account.
+
+        Args:
+            oauth: Name of the OAuth client.
+            account_id: Id. of the account on the external OAuth service.
+            request: The litestar request that initiated the action.
+
+        Raises:
+            NotFoundError: The user or OAuth account does not exist.
+
+        Returns:
+            A user.
+        """
+        load: LoadSpec | None = request.route_handler.opt.get("user_load_options") if request else None
+
+        if self.oauth2_repository is None:
+            raise ImproperlyConfiguredException("oauth2 has not been configured")
+        oauth2 = await self.oauth2_repository.get_one(oauth_name=oauth, account_id=account_id)
+        if oauth2 is None:
+            raise NotFoundError("OAuth account not found")
+        user = await self.get_user(oauth2.user_id, load=load)
+        if user is None:
+            raise NotFoundError("User not found")
+
+        return user
+
+    async def _oauth2_callback(
+        self,
+        oauth_name: str,
+        account_id: str,
+        account_email: str,
+        associate_by_email: bool,
+        is_verified_by_default: bool,
+        state: str,
+        state_secret: str,
+        oauth_account_dict: dict[str, Any],
+        request: Request | None = None,
+    ) -> SQLAUserT:
+        if self.oauth2_repository is None:
+            raise ImproperlyConfiguredException("oauth2 has not been configured")
+        user: SQLAUserT | None
+        try:
+            decode_jwt(state, state_secret, [STATE_TOKEN_AUDIENCE])
+        except jwt.DecodeError as exc:
+            raise HTTPException(status_code=status_codes.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        try:
+            user = await self.get_by_oauth_account(oauth_name, account_id)
+        except NotFoundError:
+            try:
+                # Associate account
+                user = await self.get_user_by(email=account_email)
+                if user is None:
+                    raise NotFoundError()
+                user = await self.oauth2_repository.add_oauth_account(user, oauth_account_dict)
+            except NotFoundError:
+                if not associate_by_email:
+                    raise HTTPException(
+                        status_code=status_codes.HTTP_400_BAD_REQUEST, detail="User already exists."
+                    ) from None
+                # Create account
+                password = self.password_manager.generate()
+                user_dict = {
+                    "email": account_email,
+                    "password_hash": self.password_manager.hash(password),
+                    "is_verified": is_verified_by_default,
+                    "is_active": True,
+                }
+                user = await self.user_repository.add(self.user_model(**user_dict))  # type: ignore[arg-type]
+                user = await self.oauth2_repository.add_oauth_account(user, oauth_account_dict)
+                await self.post_registration_hook(user, request)
+        else:
+            # Update oauth
+            for existing_oauth_account in user.oauth_accounts:  # type: ignore[union-attr]
+                if existing_oauth_account.account_id == account_id and existing_oauth_account.oauth_name == oauth_name:
+                    user = await self.oauth2_repository.update_oauth_account(
+                        user,
+                        cast(SQLAOAuthAccountT, existing_oauth_account),
+                        oauth_account_dict,
+                    )
+
+        return user
+
+    async def _oauth2_associate_callback(
+        self,
+        associate_user: SQLAUserT,
+        state: str,
+        state_secret: str,
+        oauth_account_dict: dict[str, Any],
+    ) -> SQLAUserT:
+        if self.oauth2_repository is None:
+            raise ImproperlyConfiguredException("oauth2 has not been configured")
+        try:
+            state_data = decode_jwt(state, state_secret, [STATE_TOKEN_AUDIENCE])
+        except jwt.DecodeError as exc:
+            raise HTTPException(status_code=status_codes.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+        if state_data["sub"] != str(associate_user.id):
+            raise HTTPException(status_code=status_codes.HTTP_400_BAD_REQUEST)
+        return await self.oauth2_repository.add_oauth_account(associate_user, oauth_account_dict)
+
+    async def oauth2_authorize(
+        self,
+        request: Request,
+        oauth_client: BaseOAuth2,
+        state_secret: str,
+        callback_route_name: str,
+        scopes: list[str] | None = None,
+        redirect_url: str | None = None,
+        state_data: dict[str, str] | None = None,
+    ) -> OAuth2AuthorizeSchema:
+        if self.oauth2_repository is None:
+            raise ImproperlyConfiguredException("oauth2 has not been configured")
+        authorize_redirect_url = redirect_url if redirect_url is not None else str(request.url_for(callback_route_name))
+
+        _state_data: dict[str, str] = state_data if state_data is not None else {}
+        state = generate_state_token(_state_data, state_secret)
+        authorization_url = await oauth_client.get_authorization_url(
+            authorize_redirect_url,
+            state,
+            scopes,
+        )
+
+        return OAuth2AuthorizeSchema(authorization_url=authorization_url)
+
+    async def oauth2_callback(
+        self,
+        data: dict[str, Any],
+        oauth_client: BaseOAuth2,
+        state_secret: str,
+        callback_route_name: str,
+        request: Request,
+        redirect_url: str | None = None,
+        associate_by_email: bool = False,
+        is_verified_by_default: bool = False,
+        is_associate_callback: bool = False,
+        associate_user: SQLAUserT | None = None,
+    ) -> SQLAUserT:
+        """Handle the callback after a successful OAuth authentication.
+
+        If the user already exists with this OAuth account, the token is updated.
+
+        If a user with the same e-mail already exists and `associate_by_email` is True,
+        the OAuth account is associated to this user.
+        Otherwise, the `UserNotExists` exception is raised.
+
+        If the user does not exist, it is created and the on_after_register handler
+        is triggered.
+
+        :param oauth_name: Name of the OAuth client.
+        :param access_token: Valid access token for the service provider.
+        :param account_id: models.ID of the user on the service provider.
+        :param account_email: E-mail of the user on the service provider.
+        :param expires_at: Optional timestamp at which the access token expires.
+        :param refresh_token: Optional refresh token to get a
+        fresh access token from the service provider.
+        :param request: Optional FastAPI request that
+        triggered the operation, defaults to None
+        :param associate_by_email: If True, any existing user with the same
+        e-mail address will be associated to this user. Defaults to False.
+        :param is_verified_by_default: If True, the `is_verified` flag will be
+        set to `True` on newly created user. Make sure the OAuth Provider you're
+        using does verify the email address before enabling this flag.
+        Defaults to False.
+        :param is_associate_callback: If True, the callback is an associate callback.
+        :param associate_user: The user to associate the OAuth account to.
+        :return: A user.
+        """
+        if self.oauth2_repository is None:
+            raise ImproperlyConfiguredException("oauth2 has not been configured")
+        _redirect_url = redirect_url if redirect_url is not None else str(request.url_for(callback_route_name))
+        _code = data["code"].replace("%2F", "/")  # Googele bug
+        token = await oauth_client.get_access_token(_code, _redirect_url, data["code_verifier"])
+        state = data["state"]
+        account_id, account_email = await oauth_client.get_id_email(token["access_token"])
+
+        if account_email is None:
+            raise HTTPException(
+                status_code=status_codes.HTTP_400_BAD_REQUEST,
+                detail="OAuth account without email",
+            )
+
+        oauth_account_dict = {
+            "oauth_name": oauth_client.name,
+            "access_token": token["access_token"],
+            "account_id": account_id,
+            "account_email": account_email,
+            "expires_at": token.get("expires_at"),
+            "refresh_token": token.get("refresh_token"),
+        }
+        if is_associate_callback:
+            if associate_user is None:
+                raise HTTPException(status_code=status_codes.HTTP_400_BAD_REQUEST, detail="Associate user is required")
+            user = await self._oauth2_associate_callback(
+                associate_user=associate_user,
+                state=state,
+                state_secret=state_secret,
+                oauth_account_dict=oauth_account_dict,
+            )
+        else:
+            user = await self._oauth2_callback(
+                oauth_name=oauth_client.name,
+                account_id=account_id,
+                account_email=account_email,
+                associate_by_email=associate_by_email,
+                is_verified_by_default=is_verified_by_default,
+                state=state,
+                state_secret=state_secret,
+                oauth_account_dict=oauth_account_dict,
+                request=request,
+            )
+
+        return user
 
 
 UserServiceType = TypeVar("UserServiceType", bound=BaseUserService)

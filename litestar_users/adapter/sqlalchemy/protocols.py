@@ -6,9 +6,24 @@ from advanced_alchemy.base import ModelProtocol
 from sqlalchemy.orm import Mapped, MappedClassProtocol
 
 if TYPE_CHECKING:
+    from datetime import datetime
     from uuid import UUID
 
-__all__ = ["SQLAlchemyRoleProtocol", "SQLAlchemyUserProtocol"]
+__all__ = ["SQLAlchemyOAuthAccountProtocol", "SQLAlchemyRoleProtocol", "SQLAlchemyUserProtocol"]
+
+
+@runtime_checkable
+class SQLAlchemyOAuthAccountProtocol(ModelProtocol, MappedClassProtocol, Protocol):  # pyright: ignore
+    """The base SQLAlchemy OAuth account type."""
+
+    id: Mapped[UUID] | Mapped[int]
+    user_id: Mapped[UUID] | Mapped[int]
+    oauth_name: Mapped[str]
+    access_token: Mapped[str]
+    account_id: Mapped[str]
+    account_email: Mapped[str]
+    expires_at: Mapped[datetime]
+    refresh_token: Mapped[str]
 
 
 @runtime_checkable
@@ -40,5 +55,21 @@ class SQLAlchemyUserRoleProtocol(SQLAlchemyUserProtocol, Protocol):  # pyright: 
     roles: Mapped[list[SQLAlchemyRoleProtocol]]
 
 
+@runtime_checkable
+class SQLAlchemyOAuth2UserProtocol(SQLAlchemyUserProtocol, Protocol):  # pyright: ignore
+    """The base SQLAlchemy OAuth account type."""
+
+    oauth_accounts: Mapped[list[SQLAlchemyOAuthAccountProtocol]]
+
+
+@runtime_checkable
+class SQLAlchemyOAuth2UserRoleProtocol(SQLAlchemyUserRoleProtocol, SQLAlchemyOAuth2UserProtocol, Protocol):  # pyright: ignore
+    """The base SQLAlchemy OAuth account type."""
+
+
 SQLARoleT = TypeVar("SQLARoleT", bound="SQLAlchemyRoleProtocol")
-SQLAUserT = TypeVar("SQLAUserT", bound="SQLAlchemyUserProtocol | SQLAlchemyUserRoleProtocol")
+SQLAOAuthAccountT = TypeVar("SQLAOAuthAccountT", bound="SQLAlchemyOAuthAccountProtocol")
+SQLAUserT = TypeVar(
+    "SQLAUserT",
+    bound="SQLAlchemyUserProtocol | SQLAlchemyUserRoleProtocol | SQLAlchemyOAuth2UserProtocol | SQLAlchemyOAuth2UserRoleProtocol",
+)

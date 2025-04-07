@@ -1,24 +1,24 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Union, cast
+from typing import TYPE_CHECKING, Annotated, Any, Union, cast
 
-from litestar import (
-    Request,
-    Response,
-    Router,
-    delete,
-    get,
-    patch,
-    post,
-    put,
-)
+from litestar import Request, Response, Router, delete, get, patch, post, put, status_codes
 from litestar.di import Provide
-from litestar.exceptions import ImproperlyConfiguredException, NotAuthorizedException, PermissionDeniedException
+from litestar.enums import MediaType
+from litestar.exceptions import (
+    HTTPException,
+    ImproperlyConfiguredException,
+    NotAuthorizedException,
+    PermissionDeniedException,
+)
+from litestar.params import Parameter
 from litestar.security.jwt import JWTAuth, JWTCookieAuth
 from litestar.security.session_auth.auth import SessionAuth
 
 from litestar_users.adapter.sqlalchemy.protocols import SQLARoleT, SQLAUserT
 from litestar_users.dependencies import provide_user_service
+from litestar_users.dtos import OAuthAuthorizeDTO
+from litestar_users.schema import OAuth2AuthorizeSchema
 
 __all__ = [
     "get_auth_handler",
@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from uuid import UUID
 
     from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO
+    from httpx_oauth.oauth2 import BaseOAuth2
     from litestar.contrib.pydantic import PydanticDTO
     from litestar.dto import DataclassDTO, DTOData, MsgspecDTO
     from litestar.handlers import HTTPRouteHandler
@@ -77,6 +78,214 @@ def get_registration_handler(
         return cast(SQLAUserT, await service.register(data.as_builtins(), request))
 
     return register
+
+
+def get_oauth2_handler(
+    path: str,
+    oauth_client: BaseOAuth2,
+    user_read_dto: type[SQLAlchemyDTO],  # pyright: ignore
+    auth_backend: JWTAuth | JWTCookieAuth | SessionAuth,
+    state_secret: str,
+    guards: list["Guard"],
+    opt: dict[str, Any] | None = None,
+    tags: list[str] | None = None,
+    redirect_url: str | None = None,
+    associate_by_email: bool = False,
+    is_verified_by_default: bool = False,
+) -> Router:
+    """Get OAuth2 route handlers.
+
+    Args:
+        path: The path for the router.
+        oauth_client: The OAuth2 client to use.
+        user_read_dto: A subclass of [UserReadDTO][litestar_users.schema.UserReadDTO]
+        auth_backend: A Litestar authentication backend.
+        state_secret: The secret to use for the state.
+        tags: A list of string tags to append to the schema of the route handler.
+        guards: A list of [Guards][litestar.types.Guard] that determines who is authorized to manage roles.
+        opt: Optional route handler 'opts' to provide additional context to Guards.
+        redirect_url: The redirect URL to use.
+        associate_by_email: Whether to associate the user by email, default is False.
+        is_verified_by_default: Whether to set the user as verified by default, default is False.
+    """
+    callback_route_name = f"oauth2:{oauth_client.name}.callback"
+
+    @get(
+        f"{path}/{oauth_client.name}/authorize",
+        dependencies={"service": Provide(provide_user_service, sync_to_thread=False)},
+        exclude_from_auth=True,
+        return_dto=OAuthAuthorizeDTO,
+        guards=guards,
+        tags=tags,
+        opt=opt,
+    )
+    async def authorize(
+        service: UserServiceType,
+        request: Request,
+        scopes: Union[list[str], None] = None,
+    ) -> OAuth2AuthorizeSchema:
+        """OAuth2 route."""
+        return await service.oauth2_authorize(
+            scopes=scopes,
+            request=request,
+            oauth_client=oauth_client,
+            state_secret=state_secret,
+            redirect_url=redirect_url,
+            callback_route_name=callback_route_name,
+        )
+
+    @get(
+        f"{path}/{oauth_client.name}/callback",
+        dependencies={"service": Provide(provide_user_service, sync_to_thread=False)},
+        exclude_from_auth=True,
+        name=callback_route_name,
+        return_dto=user_read_dto,
+        guards=guards,
+        tags=tags,
+        opt=opt,
+    )
+    async def callback(
+        service: UserServiceType,
+        request: Request,
+        code_param: Annotated[Union[str, None], Parameter(query="code")] = None,
+        code_verifier_param: Annotated[Union[str, None], Parameter(query="code_verifier")] = None,
+        state_param: Annotated[Union[str, None], Parameter(query="state")] = None,
+        error_param: Annotated[Union[str, None], Parameter(query="error")] = None,
+    ) -> Response[SQLAUserT]:
+        """OAuth2 callback route."""
+        user = await service.oauth2_callback(
+            data={
+                "code": code_param,
+                "code_verifier": code_verifier_param,
+                "state": state_param,
+                "error": error_param,
+            },
+            request=request,
+            redirect_url=redirect_url,
+            callback_route_name=callback_route_name,
+            oauth_client=oauth_client,
+            state_secret=state_secret,
+            associate_by_email=associate_by_email,
+            is_verified_by_default=is_verified_by_default,
+        )
+        if user.is_active is False:
+            raise HTTPException(status_code=status_codes.HTTP_400_BAD_REQUEST, detail="User is not active.") from None
+        if isinstance(auth_backend, SessionAuth):
+            request.set_session({**request.session, "user_id": user.id})
+            return Response(
+                content=cast(SQLAUserT, user),
+                status_code=status_codes.HTTP_201_CREATED,
+                media_type=MediaType.JSON,
+            )
+        return auth_backend.login(identifier=str(user.id), response_body=cast(SQLAUserT, user))
+
+    return Router(path="/", route_handlers=[authorize, callback])
+
+
+def get_oauth2_associate_handler(
+    path: str,
+    oauth_client: BaseOAuth2,
+    user_read_dto: type[SQLAlchemyDTO],  # pyright: ignore
+    auth_backend: JWTAuth | JWTCookieAuth | SessionAuth,
+    state_secret: str,
+    guards: list["Guard"],
+    opt: dict[str, Any] | None = None,
+    tags: list[str] | None = None,
+    redirect_url: str | None = None,
+    associate_by_email: bool = False,
+    is_verified_by_default: bool = False,
+) -> Router:
+    """Get OAuth2 route handlers.
+
+    Args:
+        path: The path for the router.
+        oauth_client: The OAuth2 client to use.
+        user_read_dto: A subclass of [UserReadDTO][litestar_users.schema.UserReadDTO]
+        auth_backend: A Litestar authentication backend.
+        state_secret: The secret to use for the state.
+        guards: A list of [Guards][litestar.types.Guard] that determines who is authorized to manage roles.
+        tags: A list of string tags to append to the schema of the route handler.
+        opt: Optional route handler 'opts' to provide additional context to Guards.
+        redirect_url: The redirect URL to use.
+        associate_by_email: Whether to associate the user by email, default is False.
+        is_verified_by_default: Whether to set the user as verified by default, default is False.
+    """
+    callback_route_name = f"oauth2-associate:{oauth_client.name}.callback"
+
+    @get(
+        f"{path}-associate/{oauth_client.name}/authorize",
+        dependencies={"service": Provide(provide_user_service, sync_to_thread=False)},
+        tags=tags,
+        guards=guards,
+        return_dto=OAuthAuthorizeDTO,
+        opt=opt,
+    )
+    async def authorize(
+        service: UserServiceType,
+        request: Request,
+        scopes: Union[list[str], None] = None,
+    ) -> OAuth2AuthorizeSchema:
+        """OAuth2 route."""
+        user_id = request.user.id
+        return await service.oauth2_authorize(
+            scopes=scopes,
+            request=request,
+            oauth_client=oauth_client,
+            state_secret=state_secret,
+            redirect_url=redirect_url,
+            callback_route_name=callback_route_name,
+            state_data={"sub": str(user_id)},
+        )
+
+    @get(
+        f"{path}-associate/{oauth_client.name}/callback",
+        dependencies={"service": Provide(provide_user_service, sync_to_thread=False)},
+        name=callback_route_name,
+        return_dto=user_read_dto,
+        guards=guards,
+        tags=tags,
+        opt=opt,
+    )
+    async def callback(
+        service: UserServiceType,
+        request: Request,
+        code_param: Annotated[Union[str, None], Parameter(query="code")] = None,
+        code_verifier_param: Annotated[Union[str, None], Parameter(query="code_verifier")] = None,
+        state_param: Annotated[Union[str, None], Parameter(query="state")] = None,
+        error_param: Annotated[Union[str, None], Parameter(query="error")] = None,
+    ) -> Response[SQLAUserT]:
+        """OAuth2 callback route."""
+        user_id = request.user.id
+        user = await service.get_user(user_id)
+        if user.is_active is False:
+            raise HTTPException(status_code=status_codes.HTTP_401_UNAUTHORIZED, detail="User is not active.") from None
+        user = await service.oauth2_callback(
+            data={
+                "code": code_param,
+                "code_verifier": code_verifier_param,
+                "state": state_param,
+                "error": error_param,
+            },
+            redirect_url=redirect_url,
+            callback_route_name=callback_route_name,
+            oauth_client=oauth_client,
+            state_secret=state_secret,
+            request=request,
+            associate_by_email=associate_by_email,
+            is_verified_by_default=is_verified_by_default,
+            is_associate_callback=True,
+            associate_user=user,
+        )
+        if isinstance(auth_backend, SessionAuth):
+            request.set_session({**request.session, "user_id": user.id})
+            return Response(
+                content=cast(SQLAUserT, user),
+                status_code=status_codes.HTTP_201_CREATED,
+                media_type=MediaType.JSON,
+            )
+        return auth_backend.login(identifier=str(user.id), response_body=cast(SQLAUserT, user))
+
+    return Router(path="/", route_handlers=[authorize, callback])
 
 
 def get_verification_handler(

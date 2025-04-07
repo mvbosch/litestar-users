@@ -13,3 +13,14 @@
         members:
             - name
             - description
+
+::: litestar_users.adapter.sqlalchemy.mixins.SQLAlchemyOAuthAccountMixin
+    options:
+        members:
+            - user_id
+            - oauth_name
+            - access_token
+            - account_id
+            - account_email
+            - expires_at
+            - refresh_token
