@@ -2,17 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
-from uuid import UUID  # noqa: TC003
 
 import uvicorn
-from advanced_alchemy.base import UUIDBase
+from advanced_alchemy.base import UUIDBase, orm_registry
 from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO, SQLAlchemyDTOConfig
 from advanced_alchemy.extensions.litestar.plugins import SQLAlchemyAsyncConfig, SQLAlchemyInitPlugin
 from litestar import Litestar, Request
 from litestar.dto import DataclassDTO
 from litestar.middleware.session.server_side import ServerSideSessionConfig
 from litestar.security.session_auth import SessionAuth
-from sqlalchemy import ForeignKey, Integer, String, Uuid
+from sqlalchemy import Column, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from litestar_users import LitestarUsersConfig, LitestarUsersPlugin
@@ -27,13 +26,18 @@ from litestar_users.config import (
     VerificationHandlerConfig,
 )
 from litestar_users.guards import roles_accepted, roles_required
-from litestar_users.password import PasswordManager
 from litestar_users.service import BaseUserService
 
 ENCODING_SECRET = "1234567890abcdef"  # noqa: S105
-DATABASE_URL = "sqlite+aiosqlite:///"
-password_manager = PasswordManager()
+DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 UUIDBase.metadata.clear()
+
+user_role = Table(
+    "user_role",
+    orm_registry.metadata,
+    Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
+    Column("role_id", ForeignKey("role.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class Role(UUIDBase, SQLAlchemyRoleMixin):
@@ -44,12 +48,7 @@ class User(UUIDBase, SQLAlchemyUserMixin):
     title: Mapped[str] = mapped_column(String(20))
     login_count: Mapped[int] = mapped_column(Integer(), default=0)
 
-    roles: Mapped[list[Role]] = relationship(Role, secondary="user_role", lazy="selectin")
-
-
-class UserRole(UUIDBase):
-    user_id: Mapped[UUID] = mapped_column(Uuid(), ForeignKey("user.id"))
-    role_id: Mapped[UUID] = mapped_column(Uuid(), ForeignKey("role.id"))
+    roles: Mapped[list[Role]] = relationship(secondary="user_role", lazy="selectin")
 
 
 class RoleCreateDTO(SQLAlchemyDTO[Role]):
