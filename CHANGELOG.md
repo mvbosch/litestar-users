@@ -1,5 +1,10 @@
 # Changelog
 
+[v1.7.0]
+
+- add OAuth2 support
+- fix role association example
+
 [v1.6.2]
 
 - fix sqlalchemy session retrieval in `provide_user_service`
