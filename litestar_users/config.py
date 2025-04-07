@@ -8,8 +8,13 @@ from litestar.exceptions import ImproperlyConfiguredException
 from litestar.security.session_auth import SessionAuth
 
 from litestar_users.adapter.sqlalchemy.repository import SQLAlchemyUserRepository
-from litestar_users.protocols import RoleT, UserT
+from litestar_users.protocols import OAuthAccountT, RoleT, UserT
 from litestar_users.schema import AuthenticationSchema
+
+try:
+    from httpx_oauth.oauth2 import BaseOAuth2
+except ModuleNotFoundError:
+    BaseOAuth2 = Any  # type: ignore[assignment,misc]
 
 __all__ = [
     "AuthHandlerConfig",
@@ -108,6 +113,39 @@ class RegisterHandlerConfig:
 
 
 @dataclass
+class OAuth2HandlerConfig:
+    """Configuration for the OAuth2 route handlers.
+
+    Passing an instance to `LitestarUsersConfig` will automatically take care of handler oauth2 auth on the app.
+    """
+
+    oauth_client: BaseOAuth2  # pyright: ignore[reportInvalidTypeForm]
+    """The OAuth2 client to use."""
+    state_secret: str
+    """Secret used to encode the state JWT."""
+    path: str = "/oauth2"
+    """The path for the OAuth2 route."""
+    tags: list[str] | None = None
+    """A list of string tags to append to the schema of the route handler(s)."""
+    guards: list[Guard] = field(default_factory=list)
+    """A list of callable [Guards][litestar.types.Guard] that determines who is authorized to manage roles."""
+    redirect_url: str | None = None
+    """The URL to redirect to after the OAuth2 flow.
+
+    If not provided, the current URL will be used.
+    """
+    associate_by_email: bool = False
+    """If True, any existing user with the same e-mail address will be associated to this user. Defaults to False."""
+    is_verified_by_default: bool = False
+    """If True, the user will be verified by default. Defaults to False."""
+    user_read_dto: type[SQLAlchemyDTO] | None = None
+    """Optional user read DTO override.
+
+    Defaults to the global `user_read_dto` in `LitestarUsersConfig`.
+    """
+
+
+@dataclass
 class RoleManagementHandlerConfig:
     """Configuration for the role management route handlers.
 
@@ -170,7 +208,7 @@ class VerificationHandlerConfig:
 
 
 @dataclass
-class LitestarUsersConfig(Generic[UserT, RoleT]):
+class LitestarUsersConfig(Generic[UserT, RoleT, OAuthAccountT]):
     """Configuration class for LitestarUsers."""
 
     auth_backend_class: type[JWTAuth | JWTCookieAuth | SessionAuth]
@@ -215,6 +253,8 @@ class LitestarUsersConfig(Generic[UserT, RoleT]):
     """
     default_token_expiration: timedelta = field(default_factory=lambda: timedelta(days=1))
     """The default expiration time for authentication tokens."""
+    oauth_account_model: type[OAuthAccountT] | None = None
+    """A `OAuthAccount` ORM model."""
     role_model: type[RoleT] | None = None
     """A `Role` ORM model.
 
@@ -274,6 +314,18 @@ class LitestarUsersConfig(Generic[UserT, RoleT]):
     Notes:
         - At least one route handler config must be set.
     """
+    oauth2_handler_config: list[OAuth2HandlerConfig] | None = None
+    """Optional OAuth2 route handler configuration. If set, registers the route handler(s) on the app.
+
+    Notes:
+        - At least one route handler config must be set.
+    """
+    oauth2_associate_handler_config: list[OAuth2HandlerConfig] | None = None
+    """Optional OAuth2 associate route handler configuration. If set, registers the route handler(s) on the app.
+
+    Notes:
+        - At least one route handler config must be set.
+    """
     role_management_handler_config: RoleManagementHandlerConfig | None = None
     """Optional role management route handler configuration. If set, registers the route handler(s) on the app.
 
@@ -311,6 +363,8 @@ class LitestarUsersConfig(Generic[UserT, RoleT]):
             "password_reset_handler_config",
             "register_handler_config",
             "role_management_handler_config",
+            "oauth2_handler_config",
+            "oauth2_associate_handler_config",
             "user_management_handler_config",
             "verification_handler_config",
         ]

@@ -17,6 +17,10 @@ Litestar-Users is an authentication, authorization and user management package f
 
 `pip install litestar-users`
 
+  or with OAuth2 support:
+
+`pip install litestar-users[oauth2]`
+
 ## Full example
 
 Example application code can be viewed [here](https://github.com/LonelyVikingMichael/litestar-users/blob/main/examples/basic.py).

@@ -15,6 +15,8 @@ from litestar_users.exceptions import TokenException, exception_to_http_response
 from litestar_users.route_handlers import (
     get_auth_handler,
     get_current_user_handler,
+    get_oauth2_associate_handler,
+    get_oauth2_handler,
     get_password_reset_handler,
     get_registration_handler,
     get_role_management_handler,
@@ -76,6 +78,7 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
                 "BaseUserService": self._config.user_service_class,
                 "SQLAUserT": self._config.user_model,
                 "SQLARoleT": self._config.role_model,
+                "SQLAOAuthAccountT": self._config.oauth_account_model,
                 "role_create_dto": self._config.role_create_dto,
                 "role_read_dto": self._config.role_read_dto,
                 "role_update_dto": self._config.role_update_dto,
@@ -174,6 +177,38 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
                     tags=self._config.register_handler_config.tags,
                 )
             )
+        if self._config.oauth2_handler_config:
+            for config in self._config.oauth2_handler_config:
+                handlers.append(
+                    get_oauth2_handler(
+                        path=config.path,
+                        tags=config.tags,
+                        guards=config.guards,
+                        oauth_client=config.oauth_client,
+                        user_read_dto=self._config.user_read_dto,
+                        auth_backend=auth_backend,
+                        state_secret=config.state_secret,
+                        redirect_url=config.redirect_url,
+                        associate_by_email=config.associate_by_email,
+                        is_verified_by_default=config.is_verified_by_default,
+                    )
+                )
+        if self._config.oauth2_associate_handler_config:
+            for config in self._config.oauth2_associate_handler_config:
+                handlers.append(
+                    get_oauth2_associate_handler(
+                        path=config.path,
+                        tags=config.tags,
+                        guards=config.guards,
+                        oauth_client=config.oauth_client,
+                        user_read_dto=self._config.user_read_dto,
+                        auth_backend=auth_backend,
+                        state_secret=config.state_secret,
+                        redirect_url=config.redirect_url,
+                        associate_by_email=config.associate_by_email,
+                        is_verified_by_default=config.is_verified_by_default,
+                    )
+                )
         if self._config.role_management_handler_config:
             handlers.append(
                 get_role_management_handler(

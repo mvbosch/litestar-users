@@ -681,6 +681,18 @@ wheels = [
 ]
 
 [[package]]
+name = "httpx-oauth"
+version = "0.16.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2f/07/db4ad128da3926be22eec586aa87dafd8840c9eb03fe88505fbed016b5c6/httpx_oauth-0.16.1.tar.gz", hash = "sha256:7402f061f860abc092ea4f5c90acfc576a40bbb79633c1d2920f1ca282c296ee", size = 44148 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/45/4b/2b81e876abf77b4af3372aff731f4f6722840ebc7dcfd85778eaba271733/httpx_oauth-0.16.1-py3-none-any.whl", hash = "sha256:2fcad82f80f28d0473a0fc4b4eda223dc952050af7e3a8c8781342d850f09fb5", size = 38056 },
+]
+
+[[package]]
 name = "idna"
 version = "3.10"
 source = { registry = "https://pypi.org/simple" }
@@ -797,7 +809,7 @@ wheels = [
 
 [[package]]
 name = "litestar-users"
-version = "1.6.1"
+version = "1.6.2"
 source = { editable = "." }
 dependencies = [
     { name = "advanced-alchemy" },
@@ -807,6 +819,11 @@ dependencies = [
     { name = "litestar", extra = ["cli", "jwt", "sqlalchemy"] },
     { name = "pyjwt" },
     { name = "pyyaml" },
+]
+
+[package.optional-dependencies]
+oauth2 = [
+    { name = "httpx-oauth" },
 ]
 
 [package.dev-dependencies]
@@ -820,6 +837,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
+    { name = "pytest-mock" },
     { name = "uvicorn" },
 ]
 
@@ -828,11 +846,13 @@ requires-dist = [
     { name = "advanced-alchemy", specifier = ">=0.31.0" },
     { name = "argon2-cffi" },
     { name = "cryptography" },
+    { name = "httpx-oauth", marker = "extra == 'oauth2'", specifier = ">=0.16.1" },
     { name = "libpass", specifier = ">=1.8.1,<2" },
     { name = "litestar", extras = ["jwt", "cli", "sqlalchemy"], specifier = ">=2.9.0,<3" },
     { name = "pyjwt", specifier = ">=2.10.1" },
     { name = "pyyaml", specifier = "!=5.4.*" },
 ]
+provides-extras = ["oauth2"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -845,6 +865,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio", specifier = ">=0.21.0,<0.22" },
     { name = "pytest-cov", specifier = ">=4.0.0,<5" },
+    { name = "pytest-mock" },
     { name = "uvicorn", specifier = ">=0.22.0,<1" },
 ]
 
@@ -1372,6 +1393,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/7a/15/da3df99fd551507694a9b01f512a2f6cf1254f33601605843c3775f39460/pytest-cov-4.1.0.tar.gz", hash = "sha256:3904b13dfbfec47f003b8e77fd5b589cd11904a21ddf1ab38a64f204d6a10ef6", size = 63245 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a7/4b/8b78d126e275efa2379b1c2e09dc52cf70df16fc3b90613ef82531499d73/pytest_cov-4.1.0-py3-none-any.whl", hash = "sha256:6ba70b9e97e69fcc3fb45bfeab2d0a138fb65c4d0d6a41ef33983ad114be8c3a", size = 21949 },
+]
+
+[[package]]
+name = "pytest-mock"
+version = "3.14.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c6/90/a955c3ab35ccd41ad4de556596fa86685bf4fc5ffcc62d22d856cfd4e29a/pytest-mock-3.14.0.tar.gz", hash = "sha256:2719255a1efeceadbc056d6bf3df3d1c5015530fb40cf347c0f9afac88410bd0", size = 32814 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f2/3b/b26f90f74e2986a82df6e7ac7e319b8ea7ccece1caec9f8ab6104dc70603/pytest_mock-3.14.0-py3-none-any.whl", hash = "sha256:0b72c38033392a5f4621342fe11e9219ac11ec9d375f8e2a0c164539e0d70f6f", size = 9863 },
 ]
 
 [[package]]

@@ -1,12 +1,10 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import ANY
 
 import pytest
 
 if TYPE_CHECKING:
     from litestar.testing import TestClient
-
-    from .conftest import Role, User
 
 
 @pytest.mark.usefixtures("authenticate_admin")
@@ -20,7 +18,7 @@ class TestRoleManagement:
             "description": "...",
         }
 
-    def test_update_role(self, client: "TestClient", writer_role: "Role") -> None:
+    def test_update_role(self, client: "TestClient", writer_role: Any) -> None:
         response = client.patch("/users/roles/76ddde3c-91d0-4b58-baa4-bfc4b3892ab2", json={"name": "editor"})
         assert response.status_code == 200
         assert response.json() == {
@@ -33,13 +31,13 @@ class TestRoleManagement:
         response = client.delete("/users/roles/76ddde3c-91d0-4b58-baa4-bfc4b3892ab2")
         assert response.status_code == 200
 
-    def test_assign_role(self, client: "TestClient", generic_user: "User", writer_role: "Role") -> None:
+    def test_assign_role(self, client: "TestClient", generic_user: Any, writer_role: Any) -> None:
         response = client.put(
             "/users/roles/assign", json={"user_id": str(generic_user.id), "role_id": str(writer_role.id)}
         )
         assert response.status_code == 200
 
-    def test_revoke_role(self, client: "TestClient", admin_user: "User", admin_role: "Role") -> None:
+    def test_revoke_role(self, client: "TestClient", admin_user: Any, admin_role: Any) -> None:
         response = client.put(
             "/users/roles/revoke", json={"user_id": str(admin_user.id), "role_id": str(admin_role.id)}
         )

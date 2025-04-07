@@ -13,6 +13,7 @@
             - user_create_dto
             - user_read_dto
             - user_update_dto
+            - oauth_account_model
             - role_model
             - role_create_dto
             - role_read_dto
@@ -23,6 +24,8 @@
             - current_user_handler_config
             - password_reset_handler_config
             - register_handler_config
+            - oauth2_handler_config
+            - oauth2_associate_handler_config
             - role_management_handler_config
             - user_management_handler_config
             - verification_handler_config

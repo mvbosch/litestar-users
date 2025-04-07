@@ -1,48 +1,51 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import uvicorn
 from advanced_alchemy.base import UUIDBase
-from advanced_alchemy.config import AsyncSessionConfig
 from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO, SQLAlchemyDTOConfig
 from advanced_alchemy.extensions.litestar.plugins import SQLAlchemyAsyncConfig, SQLAlchemyInitPlugin
+from httpx_oauth.clients.google import GoogleOAuth2
 from litestar import Litestar, Request
 from litestar.dto import DataclassDTO
-from litestar.exceptions import NotAuthorizedException
 from litestar.middleware.session.server_side import ServerSideSessionConfig
 from litestar.security.session_auth import SessionAuth
-from sqlalchemy import Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from litestar_users import LitestarUsersConfig, LitestarUsersPlugin
-from litestar_users.adapter.sqlalchemy.mixins import SQLAlchemyUserMixin
+from litestar_users.adapter.sqlalchemy.mixins import SQLAlchemyOAuthAccountMixin, SQLAlchemyUserMixin
 from litestar_users.config import (
     AuthHandlerConfig,
     CurrentUserHandlerConfig,
+    OAuth2HandlerConfig,
     PasswordResetHandlerConfig,
     RegisterHandlerConfig,
+    RoleManagementHandlerConfig,
     UserManagementHandlerConfig,
     VerificationHandlerConfig,
 )
+from litestar_users.guards import roles_accepted, roles_required
 from litestar_users.password import PasswordManager
 from litestar_users.service import BaseUserService
-
-if TYPE_CHECKING:
-    from litestar.connection import ASGIConnection
-    from litestar.handlers.base import BaseRouteHandler
 
 ENCODING_SECRET = "1234567890abcdef"  # noqa: S105
 DATABASE_URL = "sqlite+aiosqlite:///"
 password_manager = PasswordManager()
-
 UUIDBase.metadata.clear()
+
+
+class OAuthAccount(UUIDBase, SQLAlchemyOAuthAccountMixin):
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"))
 
 
 class User(UUIDBase, SQLAlchemyUserMixin):
     title: Mapped[str] = mapped_column(String(20))
     login_count: Mapped[int] = mapped_column(Integer(), default=0)
+
+    oauth_accounts: Mapped[list[OAuthAccount]] = relationship(OAuthAccount, lazy="selectin")
 
 
 @dataclass
@@ -57,32 +60,29 @@ class UserRegistrationDTO(DataclassDTO[UserRegistrationSchema]):
 
 
 class UserReadDTO(SQLAlchemyDTO[User]):
-    config = SQLAlchemyDTOConfig(exclude={"login_count"})
+    config = SQLAlchemyDTOConfig(exclude={"password_hash"})
 
 
 class UserUpdateDTO(SQLAlchemyDTO[User]):
     # we'll update `login_count` in UserService.post_login_hook
-    config = SQLAlchemyDTOConfig(exclude={"login_count"}, partial=True)
+    config = SQLAlchemyDTOConfig(exclude={"id", "login_count"}, partial=True)
+    # we'll update `login_count` in the UserService.post_login_hook
 
 
-class UserService(BaseUserService[User, Any, Any]):  # type: ignore[type-var]
+class UserService(BaseUserService[User, Any, OAuthAccount]):  # type: ignore[type-var]
     async def post_login_hook(self, user: User, request: Request | None = None) -> None:
         # This will properly increment the user's `login_count`
         user.login_count += 1  # pyright: ignore
 
 
-def example_authorization_guard(connection: "ASGIConnection", _: "BaseRouteHandler") -> None:
-    """Authorize a request if the user's email string contains 'admin'."""
-    if "admin" in connection.user.email:  # Don't do this in production
-        return
-    raise NotAuthorizedException()
-
-
 sqlalchemy_config = SQLAlchemyAsyncConfig(
     connection_string=DATABASE_URL,
     session_dependency_key="session",
-    session_config=AsyncSessionConfig(expire_on_commit=False),
 )
+
+
+# See https://frankie567.github.io/httpx-oauth/ for more details
+oauth_client = GoogleOAuth2("CLIENT_ID", "CLIENT_SECRET", name="google")
 
 
 async def on_startup() -> None:
@@ -91,7 +91,7 @@ async def on_startup() -> None:
         await conn.run_sync(UUIDBase.metadata.create_all)
 
 
-litestar_users = LitestarUsersPlugin(
+litestar_users_plugin = LitestarUsersPlugin(
     config=LitestarUsersConfig(
         auth_backend_class=SessionAuth,
         session_backend_config=ServerSideSessionConfig(),
@@ -105,17 +105,26 @@ litestar_users = LitestarUsersPlugin(
         current_user_handler_config=CurrentUserHandlerConfig(),
         password_reset_handler_config=PasswordResetHandlerConfig(),
         register_handler_config=RegisterHandlerConfig(),
-        user_management_handler_config=UserManagementHandlerConfig(guards=[example_authorization_guard]),
+        role_management_handler_config=RoleManagementHandlerConfig(guards=[roles_accepted("administrator")]),
+        user_management_handler_config=UserManagementHandlerConfig(guards=[roles_required("administrator")]),
         verification_handler_config=VerificationHandlerConfig(),
+        oauth_account_model=OAuthAccount,  # pyright: ignore
+        oauth2_handler_config=[
+            OAuth2HandlerConfig(
+                oauth_client=oauth_client,
+                state_secret="state_secret",  # noqa: S106
+                is_verified_by_default=True,
+            )
+        ],
     )
 )
 
 app = Litestar(
     debug=True,
     on_startup=[on_startup],
-    plugins=[SQLAlchemyInitPlugin(config=sqlalchemy_config), litestar_users],
+    plugins=[SQLAlchemyInitPlugin(config=sqlalchemy_config), litestar_users_plugin],
     route_handlers=[],
 )
 
 if __name__ == "__main__":
-    uvicorn.run(app="basic:app", reload=True)
+    uvicorn.run(app="with_oauth:app", reload=True)

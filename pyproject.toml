@@ -16,9 +16,16 @@ dependencies = [
     "pyjwt>=2.10.1",
 ]
 
+
+[project.optional-dependencies]
+oauth2 = [
+    "httpx-oauth >=0.16.1"
+]
+
 [dependency-groups]
 dev = [
     "pytest",
+    "pytest-mock",
     "mkdocs>=1.4.2",
     "aiosqlite",
     "mkdocs-material>=8.5.11",
@@ -26,6 +33,7 @@ dev = [
     "pytest-cov>=4.0.0,<5",
     "attrs>=23.1.0,<24",
     "asyncpg>=0.29.0",
+    "httpx-oauth >=0.16.1",
     "pytest-asyncio>=0.21.0,<0.22",
     "uvicorn>=0.22.0,<1",
 ]
@@ -155,3 +163,4 @@ docstring-code-line-length = 88
 "litestar_users/exceptions.py" = ["N818"]
 "litestar_users/route_handlers.py" = ["TCH001", "UP007"]
 "tests/integration/test_roles/conftest.py" = ["UP006"]
+"tests/integration/test_oauth/conftest.py" = ["UP006"]

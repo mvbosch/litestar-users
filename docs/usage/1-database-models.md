@@ -94,3 +94,40 @@ from sqlalchemy.orm import Mapped, mapped_column
 class Role(UUIDBase, SQLAlchemyRoleMixin):
     created_at: Mapped[datetime] = mapped_column(DateTime(), default=datetime.now)
 ```
+
+!!! note
+    You can skip the next section if you're not making use of Litestar User's with OAuth2.
+
+## The OAuth account model
+
+For OAuth2, additionally set up a `OAuthAccount` model along with a user-oauth account association table.
+
+!!! note
+    You must set your own `User.oauth_accounts` relationship and association table, since this is dependent on your own `__tablename__` definitions.
+
+### SQLAlchemy OAuth Account
+
+```python
+from uuid import UUID
+from advanced_alchemy.base import UUIDBase
+from litestar_users.adapter.sqlalchemy.mixins import (
+    SQLAlchemyOAuthAccountMixin,
+    SQLAlchemyUserMixin,
+)
+from sqlalchemy import ForeignKey, Uuid
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+
+class OAuthAccount(UUIDBase, SQLAlchemyOAuthAccountMixin):
+    """OAuth account model."""
+
+    user_id: Mapped[UUID] = mapped_column(Uuid(), ForeignKey("user.id"))
+
+
+class User(UUIDBase, SQLAlchemyUserMixin):
+    """User model."""
+
+    oauth_accounts: Mapped[list[OAuthAccount]] = relationship(
+        OAuthAccount, lazy="selectin"
+    )
+```

@@ -53,3 +53,11 @@ Provides the following route handlers:
 Provides the following route handlers:
 
 * `verify`: Update a user's `is_verified` status to `True`, given a valid token.
+
+
+## [`OAuth2HandlerConfig`][litestar_users.config.OAuth2HandlerConfig]
+
+Provides the following route handlers:
+
+* `authorize`: Redirects the user to the OAuth2 provider's authorization page.
+* `callback`: Handles the OAuth2 provider's callback.
