@@ -82,7 +82,6 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
                 "authentication_schema": self._config.authentication_request_schema,
                 "UserRoleSchema": UserRoleSchema,
                 "UserServiceType": self._config.user_service_class,
-                "BaseUserService": self._config.user_service_class,
                 "SQLAUserT": self._config.user_model,
                 "SQLARoleT": self._config.role_model,
                 "SQLAOAuthAccountT": self._config.oauth_account_model,
@@ -206,19 +205,17 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
         else:
             app_config.openapi_config.security = [security_requirement]
 
-    def get_user_identifier_uri(self) -> str:
+    def _get_user_identifier_uri(self) -> str:
         if isinstance(self._config.user_model.id.type, (GUID, Uuid)):
             return "/{user_id:uuid}"
         if isinstance(self._config.user_model.id.type, BigInteger):
             return "/{user_id:int}"
         raise ValueError("user identifier type not supported")
 
-    def get_role_identifier_uri(self) -> str:
-        if self._config.role_model is None:
-            return ""
-        if isinstance(self._config.role_model.id.type, (GUID, Uuid)):
+    def _get_role_identifier_uri(self) -> str:
+        if isinstance(self._config.role_model.id.type, (GUID, Uuid)):  # type: ignore[union-attr]
             return "/{role_id:uuid}"
-        if isinstance(self._config.role_model.id.type, BigInteger):
+        if isinstance(self._config.role_model.id.type, BigInteger):  # type: ignore[union-attr]
             return "/{role_id:int}"
         raise ValueError("role identifier type not supported")
 
@@ -304,7 +301,7 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
                     assign_role_path=self._config.role_management_handler_config.assign_role_path,
                     revoke_role_path=self._config.role_management_handler_config.revoke_role_path,
                     guards=self._config.role_management_handler_config.guards,
-                    identifier_uri=self.get_role_identifier_uri(),
+                    identifier_uri=self._get_role_identifier_uri(),
                     role_create_dto=self._config.role_management_handler_config.role_create_dto,
                     role_read_dto=self._config.role_management_handler_config.role_read_dto,
                     role_update_dto=self._config.role_management_handler_config.role_update_dto,
@@ -318,7 +315,7 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
                 get_user_management_handler(
                     path_prefix=self._config.user_management_handler_config.path_prefix,
                     guards=self._config.user_management_handler_config.guards,
-                    identifier_uri=self.get_user_identifier_uri(),
+                    identifier_uri=self._get_user_identifier_uri(),
                     user_read_dto=self._config.user_management_handler_config.user_read_dto
                     or self._config.user_read_dto,
                     user_update_dto=self._config.user_update_dto,
