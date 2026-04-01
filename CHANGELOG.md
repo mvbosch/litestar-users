@@ -1,5 +1,20 @@
 # Changelog
 
+[v2.0.0]
+
+- **breaking**: replace `auth_backend_class` and `session_backend_config` with a single `auth_config` field on `LitestarUsersConfig`. Pass `ServerSideSessionConfig`, `CookieBackendConfig`, `JWTAuthConfig`, or `JWTCookieAuthConfig` directly.
+- **breaking**: add `JWTAuthConfig` and `JWTCookieAuthConfig` dataclasses replacing the previous JWT backend class approach.
+- **breaking**: move `role_create_dto`, `role_read_dto`, and `role_update_dto` from `LitestarUsersConfig` to `RoleManagementHandlerConfig` as required positional fields.
+- **breaking**: remove `assign_role` and `revoke_role` from `SQLAlchemyRoleRepository`; role mutations are now handled in `BaseUserService` via `user_repository.update()`.
+- **breaking**: remove `_update` from `SQLAlchemyUserRepository`; password rehash on login now uses `user_repository.update()` directly.
+- **breaking**: mixins are now importable from `litestar_users.mixins` (previously only `litestar_users.adapter.sqlalchemy.mixins`).
+- **breaking**: role guards now raise the correct HTTP 403 status exception instead of the incorrect 401.
+- add `AnonymousUser` and `no_validation` for opt-in anonymous access on individual route handlers.
+- add `OAuth2HandlerConfig` to `__all__` in `litestar_users.config`.
+- fix repository `add_oauth_account` and `update_oauth_account` to use `self.add()`/`self.update()` for consistent `auto_commit` behaviour.
+- add example tests covering registration, login, duplicate rejection, and route registration for all three example applications.
+- update documentation to reflect all API changes.
+
 [v1.7.0]
 
 - add OAuth2 support
