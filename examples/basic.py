@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 import uvicorn
 from advanced_alchemy.base import UUIDBase
-from advanced_alchemy.config import AsyncSessionConfig
 from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO, SQLAlchemyDTOConfig
 from advanced_alchemy.extensions.litestar.plugins import SQLAlchemyAsyncConfig, SQLAlchemyInitPlugin
 from litestar import Litestar, Request
@@ -80,7 +79,7 @@ def example_authorization_guard(connection: "ASGIConnection", _: "BaseRouteHandl
 sqlalchemy_config = SQLAlchemyAsyncConfig(
     connection_string=DATABASE_URL,
     session_dependency_key="session",
-    session_config=AsyncSessionConfig(expire_on_commit=False),
+    before_send_handler="autocommit",
 )
 
 

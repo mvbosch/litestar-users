@@ -82,6 +82,7 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
                 "authentication_schema": self._config.authentication_request_schema,
                 "UserRoleSchema": UserRoleSchema,
                 "UserServiceType": self._config.user_service_class,
+                "BaseUserService": self._config.user_service_class,
                 "SQLAUserT": self._config.user_model,
                 "SQLARoleT": self._config.role_model,
                 "SQLAOAuthAccountT": self._config.oauth_account_model,

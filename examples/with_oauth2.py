@@ -73,6 +73,7 @@ class UserService(BaseUserService[User, Any, OAuthAccount]):  # type: ignore[typ
 sqlalchemy_config = SQLAlchemyAsyncConfig(
     connection_string=DATABASE_URL,
     session_dependency_key="session",
+    before_send_handler="autocommit",
 )
 
 
