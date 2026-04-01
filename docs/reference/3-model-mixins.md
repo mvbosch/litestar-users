@@ -1,6 +1,6 @@
-# Database model mixins
+# Database Model Mixins
 
-::: litestar_users.adapter.sqlalchemy.mixins.SQLAlchemyUserMixin
+::: litestar_users.mixins.SQLAlchemyUserMixin
     options:
         members:
             - email
@@ -8,13 +8,13 @@
             - is_active
             - is_verified
 
-::: litestar_users.adapter.sqlalchemy.mixins.SQLAlchemyRoleMixin
+::: litestar_users.mixins.SQLAlchemyRoleMixin
     options:
         members:
             - name
             - description
 
-::: litestar_users.adapter.sqlalchemy.mixins.SQLAlchemyOAuthAccountMixin
+::: litestar_users.mixins.SQLAlchemyOAuthAccountMixin
     options:
         members:
             - user_id

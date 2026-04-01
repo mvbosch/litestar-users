@@ -261,9 +261,10 @@ class LitestarUsersConfig(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):
     """Configuration class for LitestarUsers."""
 
     auth_config: JWTAuthConfig | JWTCookieAuthConfig | BaseBackendConfig
-    """Authentication backend configuration. Use one of ``JWTAuthConfig``,
-    ``JWTCookieAuthConfig``, or a Litestar session backend config such as
-    ``ServerSideSessionConfig`` or ``CookieBackendConfig``.
+    """Authentication backend configuration. Use one of [JWTAuthConfig][litestar_users.config.JWTAuthConfig],
+    [JWTCookieAuthConfig][litestar_users.config.JWTCookieAuthConfig], or a Litestar session backend config such as
+    [ServerSideSessionConfig][litestar.middleware.session.server_side.ServerSideSessionConfig] or
+    [CookieBackendConfig][litestar.middleware.session.client_side.CookieBackendConfig].
     """
     secret: str
     """Secret string for securely signing tokens.
