@@ -21,14 +21,14 @@ Provides the following route handlers:
 
 Provides the following route handlers:
 
-* `forgot_password`: Inititiates the password reset flow. Always returns a HTTP 2XX status code.
+* `forgot_password`: Initiates the password reset flow. Always returns a HTTP 2XX status code.
 * `reset_password`: Reset a user's password, given a valid reset token.
 
 ## [`RegisterHandlerConfig`][litestar_users.config.RegisterHandlerConfig]
 
 Provides the following route handlers:
 
-* `register` (aka signup). By default, newly registered users will need to verify their account before they can proceed to login. This behavior can be changed setting [`require_verification_on_registration`][litestar_users.config.LitestarUsersConfig.require_verification_on_registration] to `False` to disable verification for new users.
+* `register` (aka signup). By default, newly registered users will need to verify their account before they can proceed to login. This behavior can be changed by setting [`require_verification_on_registration`][litestar_users.config.LitestarUsersConfig.require_verification_on_registration] to `False`.
 
 ## [`RoleManagementHandlerConfig`][litestar_users.config.RoleManagementHandlerConfig]
 
@@ -39,6 +39,33 @@ Provides the following route handlers:
 * `delete_role`: Delete a role from the database.
 * `assign_role`: Assign an existing role to an existing user.
 * `revoke_role`: Revoke an existing role from an existing user.
+
+`RoleManagementHandlerConfig` requires three positional DTO arguments:
+
+```python
+from litestar_users.config import RoleManagementHandlerConfig
+from litestar_users.guards import roles_accepted
+
+
+# Stub definitions — see Data transfer objects -> Role DTOs for the full implementation
+class RoleCreateDTO: ...  # noqa: E701
+
+
+class RoleReadDTO: ...  # noqa: E701
+
+
+class RoleUpdateDTO: ...  # noqa: E701
+
+
+role_management_handler_config = RoleManagementHandlerConfig(
+    role_create_dto=RoleCreateDTO,
+    role_read_dto=RoleReadDTO,
+    role_update_dto=RoleUpdateDTO,
+    guards=[roles_accepted("administrator")],
+)
+```
+
+See [Data transfer objects](./2-data-transfer-objects.md) for how to define the role DTOs.
 
 ## [`UserManagementHandlerConfig`][litestar_users.config.UserManagementHandlerConfig]
 

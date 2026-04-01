@@ -16,7 +16,7 @@ The [SQLAlchemyUserMixin][litestar_users.adapter.sqlalchemy.mixins.SQLAlchemyUse
 
 ```python
 from advanced_alchemy.base import UUIDBase
-from litestar_users.adapter.sqlalchemy.mixins import SQLAlchemyUserMixin
+from litestar_users.mixins import SQLAlchemyUserMixin
 
 
 class User(UUIDBase, SQLAlchemyUserMixin):
@@ -27,7 +27,7 @@ The user model can be extended arbitrarily:
 
 ```python
 from advanced_alchemy.base import UUIDBase
-from litestar_users.adapter.sqlalchemy.mixins import SQLAlchemyUserMixin
+from litestar_users.mixins import SQLAlchemyUserMixin
 from sqlalchemy import Integer
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -46,19 +46,25 @@ class User(UUIDBase, SQLAlchemyUserMixin):
 For RBAC (role based access control), additionally set up a `Role` model along with a user-role association table.
 
 !!! note
-    You must set your own `User.roles` relationship and association table, since this is dependent on your own `__tablename__` definitions.
+    You must define your own `User.roles` relationship and association table, as these depend on your own `__tablename__` definitions.
 
 ### SQLAlchemy Role
 
+Use a Core `Table` for the association so that no extra ORM entity is introduced:
+
 ```python
-from uuid import UUID
-from advanced_alchemy.base import UUIDBase
-from litestar_users.adapter.sqlalchemy.mixins import (
-    SQLAlchemyUserMixin,
-    SQLAlchemyRoleMixin,
+from advanced_alchemy.base import UUIDBase, orm_registry
+from litestar_users.mixins import SQLAlchemyUserMixin, SQLAlchemyRoleMixin
+from sqlalchemy import Column, ForeignKey, Table
+from sqlalchemy.orm import Mapped, relationship
+
+
+user_role = Table(
+    "user_role",
+    orm_registry.metadata,
+    Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
+    Column("role_id", ForeignKey("role.id", ondelete="CASCADE"), primary_key=True),
 )
-from sqlalchemy import ForeignKey, Uuid
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
 class Role(UUIDBase, SQLAlchemyRoleMixin):
@@ -68,25 +74,16 @@ class Role(UUIDBase, SQLAlchemyRoleMixin):
 class User(UUIDBase, SQLAlchemyUserMixin):
     """User model."""
 
-    roles: Mapped[list[Role]] = relationship(
-        "Role", secondary="user_role", lazy="selectin"
-    )
-
-
-class UserRole(UUIDBase):
-    """User role association model."""
-
-    user_id: Mapped[UUID] = mapped_column(Uuid(), ForeignKey("user.id"))
-    role_id: Mapped[UUID] = mapped_column(Uuid(), ForeignKey("role.id"))
+    roles: Mapped[list[Role]] = relationship(secondary="user_role", lazy="selectin")
 ```
 
-Just as with the user model, you can define arbitrary custom columns:
+Just as with the user model, you can define arbitrary custom columns on `Role`:
 
 ```python
 from datetime import datetime
 
 from advanced_alchemy.base import UUIDBase
-from litestar_users.adapter.sqlalchemy.mixins import SQLAlchemyRoleMixin
+from litestar_users.mixins import SQLAlchemyRoleMixin
 from sqlalchemy import DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -96,21 +93,18 @@ class Role(UUIDBase, SQLAlchemyRoleMixin):
 ```
 
 !!! note
-    You can skip the next section if you're not making use of Litestar User's with OAuth2.
+    You can skip the next section if you're not making use of Litestar Users with OAuth2.
 
 ## The OAuth account model
 
-For OAuth2, additionally set up a `OAuthAccount` model along with a user-oauth account association table.
-
-!!! note
-    You must set your own `User.oauth_accounts` relationship and association table, since this is dependent on your own `__tablename__` definitions.
+For OAuth2, set up an `OAuthAccount` model with a foreign key back to the user.
 
 ### SQLAlchemy OAuth Account
 
 ```python
 from uuid import UUID
 from advanced_alchemy.base import UUIDBase
-from litestar_users.adapter.sqlalchemy.mixins import (
+from litestar_users.mixins import (
     SQLAlchemyOAuthAccountMixin,
     SQLAlchemyUserMixin,
 )

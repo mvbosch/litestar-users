@@ -21,10 +21,10 @@ from advanced_alchemy.extensions.litestar.plugins import (
     SQLAlchemyInitPlugin,
 )
 from litestar.dto import DataclassDTO
-from litestar.security.session_auth import SessionAuth
+from litestar.middleware.session.server_side import ServerSideSessionConfig
 
 from litestar_users import LitestarUsersPlugin, LitestarUsersConfig
-from litestar_users.adapter.sqlalchemy.mixins import SQLAlchemyUserMixin
+from litestar_users.mixins import SQLAlchemyUserMixin
 from litestar_users.config import (
     AuthHandlerConfig,
     RegisterHandlerConfig,
@@ -59,7 +59,7 @@ class UserUpdateDTO(SQLAlchemyDTO[User]):
 
 
 class UserService(BaseUserService[User, Any, Any]):  # type: ignore[type-var]
-    async def post_registration_hook(self, user: User) -> None:
+    async def post_registration_hook(self, user: User, request: Any = None) -> None:
         print(f"User <{user.email}> has registered!")
 
 
@@ -71,7 +71,7 @@ sqlalchemy_config = SQLAlchemyAsyncConfig(
 
 litestar_users = LitestarUsersPlugin(
     config=LitestarUsersConfig(
-        auth_backend_class=SessionAuth,
+        auth_config=ServerSideSessionConfig(),
         secret=ENCODING_SECRET,
         user_model=User,  # pyright: ignore
         user_read_dto=UserReadDTO,
@@ -93,13 +93,63 @@ if __name__ == "__main__":
     uvicorn.run(app="basic:app", reload=True)
 ```
 
-!!! warning
-    It is recommended to set `SQLAlchemyAsyncConfig.before_send_handler` to `"autocommit"`, which will ensure that database transactions are atomically committed at the end of the request/response lifecycle if no errors are raised, else the transaction will be rolled back.
+## Authentication backends
 
-    Alternatively, you could set [LitestarUsersConfig.auto_commit_transactions][litestar_users.config.LitestarUsersConfig.auto_commit_transactions] to `True`, however this method commits transactions immediately after invoking methods such as `UserService.register` etc. This can lead to undesired state where a user registers and is committed to the database, though an uncaught exception in the `post_registration_hook` causes an internal server error. This would lead the user to believe that the operation failed, though a second registration attempt would probably result in a duplicate registration error.
+The `auth_config` parameter accepts one of:
+
+| Config class | Backend |
+| --- | --- |
+| `ServerSideSessionConfig` / `CookieBackendConfig` | Session-based (cookie) |
+| [`JWTAuthConfig`][litestar_users.config.JWTAuthConfig] | Stateless JWT bearer token |
+| [`JWTCookieAuthConfig`][litestar_users.config.JWTCookieAuthConfig] | JWT stored in an `HttpOnly` cookie |
+
+```python
+from litestar_users.config import JWTAuthConfig
+
+# Pass JWTAuthConfig() as auth_config; all other LitestarUsersConfig fields are unchanged
+auth_config = JWTAuthConfig()
+```
+
+!!! warning
+    Set `SQLAlchemyAsyncConfig.before_send_handler` to `"autocommit"` to ensure database transactions are committed atomically at the end of the request/response lifecycle. If an error is raised the transaction is rolled back automatically.
+
+    Alternatively, you may set [LitestarUsersConfig.auto_commit_transactions][litestar_users.config.LitestarUsersConfig.auto_commit_transactions] to `True`, but this commits immediately after each service call (e.g. `UserService.register`). If a subsequent `post_registration_hook` raises an exception the user will have already been persisted, resulting in a confusing duplicate-registration error on the next attempt.
 
 !!! note
-    Aside from the pre-configured public routes provided by Litestar-Users, *all* the routes on your application will require authentication unless specified otherwise in [LitestarUsersConfig.auth_exclude_paths][litestar_users.config.LitestarUsersConfig.auth_exclude_paths]
+    Aside from the pre-configured public routes provided by Litestar-Users, *all* routes on your application require authentication unless excluded via [LitestarUsersConfig.auth_exclude_paths][litestar_users.config.LitestarUsersConfig.auth_exclude_paths].
 
 !!! note
     Litestar-Users requires the use of a corresponding `Litestar` [plugin](https://docs.litestar.dev/latest/usage/plugins/index.html) for database management.
+
+## Anonymous users
+
+By default every route (except those in `auth_exclude_paths`) requires a valid session or token. If you need a route to be accessible to unauthenticated callers without excluding it globally, Litestar-Users provides [`AnonymousUser`][litestar_users.AnonymousUser] and [`no_validation`][litestar_users.no_validation].
+
+Declare `current_user` as a union that includes `AnonymousUser` on any handler that should accept unauthenticated requests. The middleware will set `request.user` to an `AnonymousUser` instance instead of raising a 401, and you can distinguish the two cases with `isinstance`:
+
+```python
+from typing import Annotated
+
+from litestar import get
+from litestar_users import AnonymousUser, no_validation
+
+from .models import User
+
+
+@get("/feed")
+async def feed(
+    current_user: Annotated[User | AnonymousUser, no_validation],
+) -> list[str]:
+    if isinstance(current_user, AnonymousUser):
+        return ["public item 1", "public item 2"]
+    return [
+        "public item 1",
+        "public item 2",
+        f"personalized item for {current_user.email}",
+    ]
+```
+
+`AnonymousUser` exposes the same base attributes as a real user (`id`, `is_active`, `is_verified`, `roles`, `oauth_accounts`) with safe sentinel defaults, so code that inspects those fields does not need special-casing.
+
+!!! note
+    The `no_validation` annotation is required because msgspec cannot coerce a union of two custom types. Without it Litestar will raise a validation error when it tries to deserialise the dependency. It is simply `Dependency(skip_validation=True)` — you can use that directly if you prefer not to import `no_validation`.
