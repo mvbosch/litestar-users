@@ -34,6 +34,7 @@ __all__ = [
     "JWTAuthConfig",
     "JWTCookieAuthConfig",
     "LitestarUsersConfig",
+    "OAuth2HandlerConfig",
     "PasswordResetHandlerConfig",
     "RegisterHandlerConfig",
     "RoleManagementHandlerConfig",
