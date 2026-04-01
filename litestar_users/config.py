@@ -2,23 +2,43 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, is_dataclass
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Any, Generic, Literal
 
+from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO
+from litestar.dto import DataclassDTO, MsgspecDTO
 from litestar.exceptions import ImproperlyConfiguredException
-from litestar.security.session_auth import SessionAuth
+from litestar.middleware.session.base import BaseBackendConfig
+from litestar.types import Guard
+
+try:
+    from litestar.plugins.pydantic import PydanticDTO
+except ImportError:
+    PydanticDTO = Any  # type: ignore[assignment,misc]
 
 from litestar_users.protocols import SQLAOAuthAccountT, SQLARoleT, SQLAUserT
 from litestar_users.repository import SQLAlchemyUserRepository
 from litestar_users.schema import AuthenticationSchema
+from litestar_users.service import BaseUserService
 
 try:
     from httpx_oauth.oauth2 import BaseOAuth2
 except ModuleNotFoundError:
     BaseOAuth2 = Any  # type: ignore[assignment,misc]
 
+if TYPE_CHECKING:
+    from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO
+    from litestar.contrib.pydantic import PydanticDTO
+    from litestar.dto import DataclassDTO, MsgspecDTO
+    from litestar.middleware.session.base import BaseBackendConfig
+    from litestar.types import Guard
+
+    from litestar_users.service import BaseUserService
+
 __all__ = [
     "AuthHandlerConfig",
     "CurrentUserHandlerConfig",
+    "JWTAuthConfig",
+    "JWTCookieAuthConfig",
     "LitestarUsersConfig",
     "PasswordResetHandlerConfig",
     "RegisterHandlerConfig",
@@ -27,15 +47,43 @@ __all__ = [
     "VerificationHandlerConfig",
 ]
 
-if TYPE_CHECKING:
-    from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO
-    from litestar.contrib.pydantic import PydanticDTO
-    from litestar.dto import DataclassDTO, MsgspecDTO
-    from litestar.middleware.session.base import BaseBackendConfig
-    from litestar.security.jwt import JWTAuth, JWTCookieAuth
-    from litestar.types import Guard
 
-    from litestar_users.service import BaseUserService
+@dataclass
+class JWTAuthConfig:
+    """Configuration for JWT-based authentication.
+
+    Pass an instance as ``auth_config`` to ``LitestarUsersConfig`` to use
+    stateless JWT bearer-token authentication.
+    """
+
+    algorithm: str = "HS256"
+    """JWT signing algorithm. Defaults to ``'HS256'``."""
+    auth_header: str = "Authorization"
+    """Request header that carries the token. Defaults to ``'Authorization'``."""
+    token_expiration: timedelta = field(default_factory=lambda: timedelta(days=1))
+    """Lifetime of issued tokens. Defaults to 1 day."""
+
+
+@dataclass
+class JWTCookieAuthConfig(JWTAuthConfig):
+    """Configuration for cookie-based JWT authentication.
+
+    Extends ``JWTAuthConfig`` with cookie-specific settings. Pass an instance
+    as ``auth_config`` to ``LitestarUsersConfig`` to store the token in an
+    ``HttpOnly`` cookie in addition to the ``Authorization`` header.
+    """
+
+    cookie_key: str = "token"
+    """Cookie name used to store the token. Defaults to ``'token'``."""
+    cookie_path: str = "/"
+    """Path scope for the cookie. Defaults to ``'/'``."""
+    cookie_secure: bool | None = None
+    """Whether the cookie requires HTTPS. ``None`` lets Litestar decide."""
+    cookie_samesite: Literal["lax", "strict", "none"] = "lax"
+    """SameSite policy for the cookie. Defaults to ``'lax'``."""
+    cookie_domain: str | None = None
+    """Domain scope for the cookie. Defaults to ``None`` (current domain)."""
+
 
 USER_CREATE_DTO_EXCLUDED_FIELDS = {"password_hash"}
 USER_READ_DTO_EXCLUDED_FIELDS = {"password"}
@@ -208,18 +256,25 @@ class VerificationHandlerConfig:
 
 
 @dataclass
-class LitestarUsersConfig(Generic[UserT, RoleT, OAuthAccountT]):
+class LitestarUsersConfig(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):
     """Configuration class for LitestarUsers."""
 
-    auth_backend_class: type[JWTAuth | JWTCookieAuth | SessionAuth]
-    """The authentication backend to use by Litestar."""
+    auth_config: JWTAuthConfig | JWTCookieAuthConfig | BaseBackendConfig
+    """Authentication backend configuration. Use one of ``JWTAuthConfig``,
+    ``JWTCookieAuthConfig``, or a Litestar session backend config such as
+    ``ServerSideSessionConfig`` or ``CookieBackendConfig``.
+    """
     secret: str
-    """Secret string for securely signing tokens."""
-    user_model: type[UserT]
+    """Secret string for securely signing tokens.
+
+    Used for password-reset / verification JWTs as well as for JWT auth backends.
+    Must be 16, 24 or 32 characters.
+    """
+    user_model: type[SQLAUserT]
     """A subclass of a `User` ORM model."""
     user_service_class: type[BaseUserService]
     """A subclass of [BaseUserService][litestar_users.service.BaseUserService]."""
-    user_registration_dto: type[DataclassDTO | MsgspecDTO | PydanticDTO]
+    user_registration_dto: type[DataclassDTO | MsgspecDTO | PydanticDTO]  # pyright: ignore[assignment]
     """DTO class user for user registration."""
     user_read_dto: type[SQLAlchemyDTO]
     """A `User` model based SQLAlchemy DTO class."""
@@ -245,17 +300,10 @@ class LitestarUsersConfig(Generic[UserT, RoleT, OAuthAccountT]):
 
     Defaults to `["argon2"]`
     """
-    session_backend_config: BaseBackendConfig | None = None
-    """Optional backend configuration for session based authentication.
 
-    Notes:
-        - Required if `auth_backend_class` is `SessionAuth`.
-    """
-    default_token_expiration: timedelta = field(default_factory=lambda: timedelta(days=1))
-    """The default expiration time for authentication tokens."""
-    oauth_account_model: type[OAuthAccountT] | None = None
+    oauth_account_model: type[SQLAOAuthAccountT] | None = None
     """A `OAuthAccount` ORM model."""
-    role_model: type[RoleT] | None = None
+    role_model: type[SQLARoleT] | None = None
     """A `Role` ORM model.
 
     Notes:
@@ -353,10 +401,6 @@ class LitestarUsersConfig(Generic[UserT, RoleT, OAuthAccountT]):
         - `role_model`, `role_create_dto`, `role_read_dto` and `role_update_dto` are required fields if
             `role_management_handler_config` is configured.
         """
-        if self.auth_backend_class == SessionAuth and not self.session_backend_config:
-            raise ImproperlyConfiguredException(
-                'session_backend_config must be set when auth_backend is set to "session"'
-            )
         handler_configs = [
             "auth_handler_config",
             "current_user_handler_config",

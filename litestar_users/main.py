@@ -5,13 +5,22 @@ from uuid import UUID
 
 from advanced_alchemy.exceptions import RepositoryError
 from advanced_alchemy.types import GUID
+from litestar.di import Provide
 from litestar.dto import DTOData
+from litestar.middleware.base import DefineMiddleware
+from litestar.middleware.session.base import BaseBackendConfig
+from litestar.openapi.spec import Components, SecurityScheme
 from litestar.plugins import CLIPluginProtocol, InitPluginProtocol
-from litestar.security.jwt import JWTAuth, JWTCookieAuth
-from litestar.security.session_auth import SessionAuth
 from sqlalchemy.sql.sqltypes import BigInteger, Uuid
 
+from litestar_users.config import JWTCookieAuthConfig
+from litestar_users.dependencies import provide_current_user
 from litestar_users.exceptions import TokenException, exception_to_http_response
+from litestar_users.middleware import (
+    LitestarUsersJWTCookieMiddleware,
+    LitestarUsersJWTMiddleware,
+    LitestarUsersSessionMiddlewareWrapper,
+)
 from litestar_users.route_handlers import (
     get_auth_handler,
     get_current_user_handler,
@@ -24,10 +33,6 @@ from litestar_users.route_handlers import (
     get_verification_handler,
 )
 from litestar_users.schema import ForgotPasswordSchema, ResetPasswordSchema, UserRoleSchema
-from litestar_users.user_handlers import (
-    jwt_retrieve_user_handler,
-    session_retrieve_user_handler,
-)
 
 __all__ = ["LitestarUsersPlugin"]
 
@@ -56,10 +61,12 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
         Args:
             app_config: An instance of [AppConfig][litestar.config.AppConfig]
         """
-        auth_backend = self._get_auth_backend()
-        route_handlers = self._get_route_handlers(auth_backend)
+        is_session_auth = isinstance(self._config.auth_config, BaseBackendConfig)
 
-        app_config = auth_backend.on_app_init(app_config)
+        self._register_middleware(app_config)
+        self._register_openapi_security(app_config)
+
+        route_handlers = self._get_route_handlers(is_session_auth)
         app_config.route_handlers.extend(route_handlers)
 
         app_config.exception_handlers.update({TokenException: exception_to_http_response})
@@ -92,12 +99,106 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
         )
         app_config.state.update({"litestar_users_config": self._config})
 
+        # Register current_user dependency unless the app already provides one
+        if "current_user" not in app_config.dependencies:
+            app_config.dependencies["current_user"] = Provide(provide_current_user, sync_to_thread=False)
+
         return app_config
 
     def on_cli_init(self, cli: Group) -> None:
-        from litestar_users.cli import user_management_group
+        from litestar_users.cli import user_management_group  # noqa: PLC0415
 
         cli.add_command(user_management_group)
+
+    def _register_middleware(self, app_config: AppConfig) -> None:
+        auth_config = self._config.auth_config
+        exclude = self._config.auth_exclude_paths
+        exclude_opt_key = "exclude_from_auth"
+        exclude_http_methods = ["OPTIONS", "HEAD"]
+
+        if isinstance(auth_config, BaseBackendConfig):
+            middleware = DefineMiddleware(
+                LitestarUsersSessionMiddlewareWrapper,
+                session_backend_config=auth_config,
+                exclude=exclude,
+                exclude_from_auth_key=exclude_opt_key,
+                exclude_http_methods=exclude_http_methods,
+                scopes=None,
+            )
+        elif isinstance(auth_config, JWTCookieAuthConfig):
+            middleware = DefineMiddleware(
+                LitestarUsersJWTCookieMiddleware,
+                algorithm=auth_config.algorithm,
+                auth_header=auth_config.auth_header,
+                cookie_key=auth_config.cookie_key,
+                token_secret=self._config.secret,
+                exclude=exclude,
+                exclude_from_auth_key=exclude_opt_key,
+                exclude_http_methods=exclude_http_methods,
+                scopes=None,
+            )
+        else:
+            # Plain JWTAuthConfig
+            middleware = DefineMiddleware(
+                LitestarUsersJWTMiddleware,
+                algorithm=auth_config.algorithm,
+                auth_header=auth_config.auth_header,
+                token_secret=self._config.secret,
+                exclude=exclude,
+                exclude_from_auth_key=exclude_opt_key,
+                exclude_http_methods=exclude_http_methods,
+                scopes=None,
+            )
+
+        app_config.middleware.insert(0, middleware)
+
+    def _register_openapi_security(self, app_config: AppConfig) -> None:
+        """Inject OpenAPI security scheme and requirement based on the auth config."""
+        if app_config.openapi_config is None:
+            return
+
+        auth_config = self._config.auth_config
+
+        if isinstance(auth_config, BaseBackendConfig):
+            scheme_name = "sessionCookie"
+            scheme = SecurityScheme(
+                type="apiKey",
+                name=auth_config.key,
+                security_scheme_in="cookie",  # type: ignore[arg-type]
+                description="Session cookie authentication.",
+            )
+        elif isinstance(auth_config, JWTCookieAuthConfig):
+            scheme_name = "BearerToken"
+            scheme = SecurityScheme(
+                type="http",
+                scheme="Bearer",
+                name=auth_config.cookie_key,
+                security_scheme_in="cookie",  # type: ignore[arg-type]
+                bearer_format="JWT",
+                description="JWT cookie-based authentication and authorization.",
+            )
+        else:
+            scheme_name = "BearerToken"
+            scheme = SecurityScheme(
+                type="http",
+                scheme="Bearer",
+                bearer_format="JWT",
+                description="JWT api-key authentication and authorization.",
+            )
+
+        components = Components(security_schemes={scheme_name: scheme})
+        existing_components = app_config.openapi_config.components
+        if isinstance(existing_components, list):
+            app_config.openapi_config.components = [*existing_components, components]
+        else:
+            app_config.openapi_config.components = [components, existing_components]
+
+        security_requirement = {scheme_name: []}
+        existing_security = app_config.openapi_config.security
+        if isinstance(existing_security, list):
+            app_config.openapi_config.security = [*existing_security, security_requirement]
+        else:
+            app_config.openapi_config.security = [security_requirement]
 
     def get_user_identifier_uri(self) -> str:
         if isinstance(self._config.user_model.id.type, (GUID, Uuid)):
@@ -115,27 +216,7 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
             return "/{role_id:int}"
         raise ValueError("role identifier type not supported")
 
-    def _get_auth_backend(self) -> JWTAuth | JWTCookieAuth | SessionAuth:
-        if issubclass(self._config.auth_backend_class, SessionAuth):
-            return self._config.auth_backend_class(
-                retrieve_user_handler=session_retrieve_user_handler,
-                session_backend_config=self._config.session_backend_config,  # type: ignore
-                exclude=self._config.auth_exclude_paths,
-            )
-        if issubclass(self._config.auth_backend_class, JWTAuth) or issubclass(
-            self._config.auth_backend_class, JWTCookieAuth
-        ):
-            return self._config.auth_backend_class(
-                default_token_expiration=self._config.default_token_expiration,
-                retrieve_user_handler=jwt_retrieve_user_handler,
-                token_secret=self._config.secret,
-                exclude=self._config.auth_exclude_paths,
-            )
-        raise ValueError("invalid auth backend")
-
-    def _get_route_handlers(
-        self, auth_backend: JWTAuth | JWTCookieAuth | SessionAuth
-    ) -> Sequence[HTTPRouteHandler | Router]:
+    def _get_route_handlers(self, is_session_auth: bool) -> Sequence[HTTPRouteHandler | Router]:
         """Parse the route handler configs to get Routers."""
 
         handlers: list[HTTPRouteHandler | Router] = []
@@ -145,9 +226,10 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
                     login_path=self._config.auth_handler_config.login_path,
                     logout_path=self._config.auth_handler_config.logout_path,
                     user_read_dto=self._config.auth_handler_config.user_read_dto or self._config.user_read_dto,
-                    auth_backend=auth_backend,
+                    is_session_auth=is_session_auth,
                     authentication_schema=self._config.authentication_request_schema,
                     tags=self._config.auth_handler_config.tags,
+                    opt=self._config.auth_handler_config.opt,
                 )
             )
         if self._config.current_user_handler_config:
@@ -186,7 +268,7 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
                         guards=config.guards,
                         oauth_client=config.oauth_client,
                         user_read_dto=self._config.user_read_dto,
-                        auth_backend=auth_backend,
+                        is_session_auth=is_session_auth,
                         state_secret=config.state_secret,
                         redirect_url=config.redirect_url,
                         associate_by_email=config.associate_by_email,
@@ -202,7 +284,7 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
                         guards=config.guards,
                         oauth_client=config.oauth_client,
                         user_read_dto=self._config.user_read_dto,
-                        auth_backend=auth_backend,
+                        is_session_auth=is_session_auth,
                         state_secret=config.state_secret,
                         redirect_url=config.redirect_url,
                         associate_by_email=config.associate_by_email,
@@ -217,11 +299,11 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
                     revoke_role_path=self._config.role_management_handler_config.revoke_role_path,
                     guards=self._config.role_management_handler_config.guards,
                     identifier_uri=self.get_role_identifier_uri(),
-                    opt=self._config.role_management_handler_config.opt,
-                    role_create_dto=self._config.role_create_dto,  # type: ignore[arg-type]
-                    role_read_dto=self._config.role_read_dto,  # type: ignore[arg-type]
-                    role_update_dto=self._config.role_update_dto,  # type: ignore[arg-type]
+                    role_create_dto=self._config.role_create_dto,  # type: ignore
+                    role_read_dto=self._config.role_read_dto,  # type: ignore
+                    role_update_dto=self._config.role_update_dto,  # type: ignore
                     user_read_dto=self._config.user_read_dto,
+                    opt=self._config.role_management_handler_config.opt,
                     tags=self._config.role_management_handler_config.tags,
                 )
             )
@@ -231,10 +313,10 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
                     path_prefix=self._config.user_management_handler_config.path_prefix,
                     guards=self._config.user_management_handler_config.guards,
                     identifier_uri=self.get_user_identifier_uri(),
-                    opt=self._config.user_management_handler_config.opt,
                     user_read_dto=self._config.user_management_handler_config.user_read_dto
                     or self._config.user_read_dto,
                     user_update_dto=self._config.user_update_dto,
+                    opt=self._config.user_management_handler_config.opt,
                     tags=self._config.user_management_handler_config.tags,
                 )
             )

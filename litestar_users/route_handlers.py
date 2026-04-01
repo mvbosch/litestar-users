@@ -1,25 +1,26 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Any, Union, cast
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from litestar import Request, Response, Router, delete, get, patch, post, put, status_codes
+from litestar.datastructures import Cookie
 from litestar.di import Provide
 from litestar.enums import MediaType
 from litestar.exceptions import (
     HTTPException,
-    ImproperlyConfiguredException,
     NotAuthorizedException,
     PermissionDeniedException,
 )
 from litestar.params import Parameter
-from litestar.security.jwt import JWTAuth, JWTCookieAuth
-from litestar.security.session_auth.auth import SessionAuth
+from litestar.security.jwt.token import Token
 
-from litestar_users.adapter.sqlalchemy.protocols import SQLARoleT, SQLAUserT
+from litestar_users.config import JWTAuthConfig, JWTCookieAuthConfig
 from litestar_users.dependencies import provide_user_service
 from litestar_users.dtos import OAuthAuthorizeDTO
 from litestar_users.protocols import SQLARoleT, SQLAUserT
 from litestar_users.schema import OAuth2AuthorizeSchema
+from litestar_users.utils import get_litestar_users_plugin
 
 try:
     from httpx_oauth.oauth2 import BaseOAuth2
@@ -54,6 +55,52 @@ if TYPE_CHECKING:
     from litestar_users.service import UserServiceType
 
 
+def _create_jwt_login_response(
+    request: Request,
+    user: SQLAUserT,
+) -> Response[SQLAUserT]:
+    """Build the HTTP response for a successful JWT login.
+
+    Reads algorithm, header name, cookie settings and token expiration from the
+    auth config stored in the app state so that the handler factory does not
+    need to capture a backend instance in a closure.
+    """
+    config = get_litestar_users_plugin(request.app)._config
+    auth_config = config.auth_config
+    if not isinstance(auth_config, JWTAuthConfig):
+        raise RuntimeError("_create_jwt_login_response called with non-JWT auth config")
+
+    token = Token(
+        sub=str(user.id),  # type: ignore[attr-defined]
+        exp=datetime.now(timezone.utc) + auth_config.token_expiration,
+    ).encode(secret=config.secret, algorithm=auth_config.algorithm)
+
+    headers = {auth_config.auth_header: f"Bearer {token}"}
+    cookies: list[Cookie] = []
+
+    if isinstance(auth_config, JWTCookieAuthConfig):
+        cookies.append(
+            Cookie(
+                key=auth_config.cookie_key,
+                value=token,
+                path=auth_config.cookie_path,
+                httponly=True,
+                max_age=int(auth_config.token_expiration.total_seconds()),
+                secure=auth_config.cookie_secure,
+                samesite=auth_config.cookie_samesite,
+                domain=auth_config.cookie_domain,
+            )
+        )
+
+    return Response(
+        content=cast("SQLAUserT", user),
+        status_code=status_codes.HTTP_201_CREATED,
+        media_type=MediaType.JSON,
+        headers=headers,
+        cookies=cookies,
+    )
+
+
 def get_registration_handler(
     path: str,
     user_registration_dto: type[DataclassDTO | MsgspecDTO | PydanticDTO],
@@ -79,7 +126,7 @@ def get_registration_handler(
     )
     async def register(data: DTOData[UserRegisterT], service: UserServiceType, request: Request) -> SQLAUserT:
         """Register a new user."""
-        return cast(SQLAUserT, await service.register(data.as_builtins(), request))
+        return cast("SQLAUserT", await service.register(data.as_builtins(), request))
 
     return register
 
@@ -88,7 +135,7 @@ def get_oauth2_handler(
     path: str,
     oauth_client: BaseOAuth2,  # pyright: ignore
     user_read_dto: type[SQLAlchemyDTO],  # pyright: ignore
-    auth_backend: JWTAuth | JWTCookieAuth | SessionAuth,
+    is_session_auth: bool,
     state_secret: str,
     guards: list["Guard"],
     opt: dict[str, Any] | None = None,
@@ -103,7 +150,7 @@ def get_oauth2_handler(
         path: The path for the router.
         oauth_client: The OAuth2 client to use.
         user_read_dto: A subclass of [UserReadDTO][litestar_users.schema.UserReadDTO]
-        auth_backend: A Litestar authentication backend.
+        is_session_auth: Whether the configured auth backend is session-based.
         state_secret: The secret to use for the state.
         tags: A list of string tags to append to the schema of the route handler.
         guards: A list of [Guards][litestar.types.Guard] that determines who is authorized to manage roles.
@@ -126,7 +173,7 @@ def get_oauth2_handler(
     async def authorize(
         service: UserServiceType,
         request: Request,
-        scopes: Union[list[str], None] = None,
+        scopes: list[str] | None = None,
     ) -> OAuth2AuthorizeSchema:
         """OAuth2 route."""
         return await service.oauth2_authorize(
@@ -151,10 +198,10 @@ def get_oauth2_handler(
     async def callback(
         service: UserServiceType,
         request: Request,
-        code_param: Annotated[Union[str, None], Parameter(query="code")] = None,
-        code_verifier_param: Annotated[Union[str, None], Parameter(query="code_verifier")] = None,
-        state_param: Annotated[Union[str, None], Parameter(query="state")] = None,
-        error_param: Annotated[Union[str, None], Parameter(query="error")] = None,
+        code_param: Annotated[str | None, Parameter(query="code")] = None,
+        code_verifier_param: Annotated[str | None, Parameter(query="code_verifier")] = None,
+        state_param: Annotated[str | None, Parameter(query="state")] = None,
+        error_param: Annotated[str | None, Parameter(query="error")] = None,
     ) -> Response[SQLAUserT]:
         """OAuth2 callback route."""
         user = await service.oauth2_callback(
@@ -174,14 +221,14 @@ def get_oauth2_handler(
         )
         if user.is_active is False:
             raise HTTPException(status_code=status_codes.HTTP_400_BAD_REQUEST, detail="User is not active.") from None
-        if isinstance(auth_backend, SessionAuth):
+        if is_session_auth:
             request.set_session({**request.session, "user_id": user.id})
             return Response(
-                content=cast(SQLAUserT, user),
+                content=cast("SQLAUserT", user),
                 status_code=status_codes.HTTP_201_CREATED,
                 media_type=MediaType.JSON,
             )
-        return auth_backend.login(identifier=str(user.id), response_body=cast(SQLAUserT, user))
+        return _create_jwt_login_response(request, user)
 
     return Router(path="/", route_handlers=[authorize, callback])
 
@@ -190,7 +237,7 @@ def get_oauth2_associate_handler(
     path: str,
     oauth_client: BaseOAuth2,  # pyright: ignore
     user_read_dto: type[SQLAlchemyDTO],  # pyright: ignore
-    auth_backend: JWTAuth | JWTCookieAuth | SessionAuth,
+    is_session_auth: bool,
     state_secret: str,
     guards: list["Guard"],
     opt: dict[str, Any] | None = None,
@@ -199,13 +246,13 @@ def get_oauth2_associate_handler(
     associate_by_email: bool = False,
     is_verified_by_default: bool = False,
 ) -> Router:
-    """Get OAuth2 route handlers.
+    """Get OAuth2 associate route handlers.
 
     Args:
         path: The path for the router.
         oauth_client: The OAuth2 client to use.
         user_read_dto: A subclass of [UserReadDTO][litestar_users.schema.UserReadDTO]
-        auth_backend: A Litestar authentication backend.
+        is_session_auth: Whether the configured auth backend is session-based.
         state_secret: The secret to use for the state.
         guards: A list of [Guards][litestar.types.Guard] that determines who is authorized to manage roles.
         tags: A list of string tags to append to the schema of the route handler.
@@ -227,7 +274,7 @@ def get_oauth2_associate_handler(
     async def authorize(
         service: UserServiceType,
         request: Request,
-        scopes: Union[list[str], None] = None,
+        scopes: list[str] | None = None,
     ) -> OAuth2AuthorizeSchema:
         """OAuth2 route."""
         user_id = request.user.id
@@ -253,10 +300,10 @@ def get_oauth2_associate_handler(
     async def callback(
         service: UserServiceType,
         request: Request,
-        code_param: Annotated[Union[str, None], Parameter(query="code")] = None,
-        code_verifier_param: Annotated[Union[str, None], Parameter(query="code_verifier")] = None,
-        state_param: Annotated[Union[str, None], Parameter(query="state")] = None,
-        error_param: Annotated[Union[str, None], Parameter(query="error")] = None,
+        code_param: Annotated[str | None, Parameter(query="code")] = None,
+        code_verifier_param: Annotated[str | None, Parameter(query="code_verifier")] = None,
+        state_param: Annotated[str | None, Parameter(query="state")] = None,
+        error_param: Annotated[str | None, Parameter(query="error")] = None,
     ) -> Response[SQLAUserT]:
         """OAuth2 callback route."""
         user_id = request.user.id
@@ -280,14 +327,14 @@ def get_oauth2_associate_handler(
             is_associate_callback=True,
             associate_user=user,
         )
-        if isinstance(auth_backend, SessionAuth):
+        if is_session_auth:
             request.set_session({**request.session, "user_id": user.id})
             return Response(
-                content=cast(SQLAUserT, user),
+                content=cast("SQLAUserT", user),
                 status_code=status_codes.HTTP_201_CREATED,
                 media_type=MediaType.JSON,
             )
-        return auth_backend.login(identifier=str(user.id), response_body=cast(SQLAUserT, user))
+        return _create_jwt_login_response(request, user)
 
     return Router(path="/", route_handlers=[authorize, callback])
 
@@ -315,7 +362,7 @@ def get_verification_handler(
     async def verify(token: str, service: UserServiceType, request: Request) -> SQLAUserT:
         """Verify a user with a given JWT."""
 
-        return cast(SQLAUserT, await service.verify(token, request))
+        return cast("SQLAUserT", await service.verify(token, request))
 
     return verify
 
@@ -324,7 +371,7 @@ def get_auth_handler(
     login_path: str,
     logout_path: str,
     user_read_dto: type[SQLAlchemyDTO],  # pyright: ignore
-    auth_backend: JWTAuth | JWTCookieAuth | SessionAuth,
+    is_session_auth: bool,
     authentication_schema: Any,
     opt: dict[str, Any] | None = None,
     tags: list[str] | None = None,
@@ -335,7 +382,7 @@ def get_auth_handler(
         login_path: The path for the login router.
         logout_path: The path for the logout router.
         user_read_dto: A subclass of [UserReadDTO][litestar_users.schema.UserReadDTO]
-        auth_backend: A Litestar authentication backend.
+        is_session_auth: Whether the configured auth backend is session-based.
         authentication_schema: The object that defines the request body schema.
         opt: Optional route handler 'opts' to provide additional context to Guards.
         tags: A list of string tags to append to the schema of the route handlers.
@@ -355,16 +402,13 @@ def get_auth_handler(
         request: Request,
     ) -> SQLAUserT:
         """Authenticate a user."""
-        if not isinstance(auth_backend, SessionAuth):
-            raise ImproperlyConfiguredException("session login can only be used with SesssionAuth")
-
         user = await service.authenticate(data, request)
         if user is None:
             request.clear_session()
             raise NotAuthorizedException(detail="login failed, invalid input")
 
         request.set_session({**request.session, "user_id": user.id})
-        return cast(SQLAUserT, user)
+        return cast("SQLAUserT", user)
 
     @post(
         login_path,
@@ -380,10 +424,6 @@ def get_auth_handler(
         request: Request,
     ) -> Response[SQLAUserT]:
         """Authenticate a user."""
-
-        if not isinstance(auth_backend, (JWTAuth, JWTCookieAuth)):
-            raise ImproperlyConfiguredException("jwt login can only be used with JWTAuth")
-
         user = await service.authenticate(data, request)
         if user is None:
             raise NotAuthorizedException(detail="login failed, invalid input")
@@ -391,20 +431,16 @@ def get_auth_handler(
         if user.is_verified is False:
             raise PermissionDeniedException(detail="not verified")
 
-        return auth_backend.login(identifier=str(user.id), response_body=cast(SQLAUserT, user))
+        return _create_jwt_login_response(request, user)
 
     @post(logout_path, tags=tags)
     async def logout(request: Request) -> None:
         """Log an authenticated user out."""
         request.clear_session()
 
-    route_handlers = []
-    if isinstance(auth_backend, SessionAuth):
-        route_handlers.extend([login_session, logout])
-    else:
-        route_handlers.append(login_jwt)
-
-    return Router(path="/", route_handlers=route_handlers)
+    if is_session_auth:
+        return Router(path="/", route_handlers=[login_session, logout])
+    return Router(path="/", route_handlers=[login_jwt])
 
 
 def get_current_user_handler(
@@ -445,7 +481,7 @@ def get_current_user_handler(
     ) -> SQLAUserT:
         """Update the current user."""
         data.id = request.user.id  # type: ignore[assignment]
-        return cast(SQLAUserT, await service.update_user(data=data))
+        return cast("SQLAUserT", await service.update_user(data=data))
 
     return Router(path="/", route_handlers=[get_current_user, update_current_user])
 
@@ -515,10 +551,10 @@ def get_user_management_handler(
         dependencies={"service": Provide(provide_user_service, sync_to_thread=False)},
         tags=tags,
     )
-    async def get_user(user_id: Union[UUID, int], service: UserServiceType) -> SQLAUserT:
+    async def get_user(user_id: UUID | int, service: UserServiceType) -> SQLAUserT:
         """Get a user by id."""
 
-        return cast(SQLAUserT, await service.get_user(user_id))
+        return cast("SQLAUserT", await service.get_user(user_id))
 
     @patch(
         path=identifier_uri,
@@ -529,10 +565,10 @@ def get_user_management_handler(
         dependencies={"service": Provide(provide_user_service, sync_to_thread=False)},
         tags=tags,
     )
-    async def update_user(user_id: Union[UUID, int], data: SQLAUserT, service: UserServiceType) -> SQLAUserT:
+    async def update_user(user_id: UUID | int, data: SQLAUserT, service: UserServiceType) -> SQLAUserT:
         """Update a user's attributes."""
         data.id = user_id  # type: ignore[assignment]
-        return cast(SQLAUserT, await service.update_user(data))
+        return cast("SQLAUserT", await service.update_user(data))
 
     @delete(
         path=identifier_uri,
@@ -543,10 +579,10 @@ def get_user_management_handler(
         dependencies={"service": Provide(provide_user_service, sync_to_thread=False)},
         tags=tags,
     )
-    async def delete_user(user_id: Union[UUID, int], service: UserServiceType) -> SQLAUserT:
+    async def delete_user(user_id: UUID | int, service: UserServiceType) -> SQLAUserT:
         """Delete a user from the database."""
 
-        return cast(SQLAUserT, await service.delete_user(user_id))
+        return cast("SQLAUserT", await service.delete_user(user_id))
 
     return Router(path=path_prefix, route_handlers=[get_user, update_user, delete_user])
 
@@ -593,7 +629,7 @@ def get_role_management_handler(
     )
     async def create_role(data: SQLARoleT, service: UserServiceType) -> SQLARoleT:
         """Create a new role."""
-        return cast(SQLARoleT, await service.add_role(data))
+        return cast("SQLARoleT", await service.add_role(data))
 
     @patch(
         path=identifier_uri,
@@ -604,10 +640,10 @@ def get_role_management_handler(
         dependencies={"service": Provide(provide_user_service, sync_to_thread=False)},
         tags=tags,
     )
-    async def update_role(role_id: Union[UUID, int], data: SQLARoleT, service: UserServiceType) -> SQLARoleT:
+    async def update_role(role_id: UUID | int, data: SQLARoleT, service: UserServiceType) -> SQLARoleT:
         """Update a role in the database."""
         data.id = role_id  # type: ignore[assignment]
-        return cast(SQLARoleT, await service.update_role(role_id, data))
+        return cast("SQLARoleT", await service.update_role(role_id, data))
 
     @delete(
         path=identifier_uri,
@@ -618,10 +654,10 @@ def get_role_management_handler(
         dependencies={"service": Provide(provide_user_service, sync_to_thread=False)},
         tags=tags,
     )
-    async def delete_role(role_id: Union[UUID, int], service: UserServiceType) -> SQLARoleT:
+    async def delete_role(role_id: UUID | int, service: UserServiceType) -> SQLARoleT:
         """Delete a role from the database."""
 
-        return cast(SQLARoleT, await service.delete_role(role_id))
+        return cast("SQLARoleT", await service.delete_role(role_id))
 
     @put(
         return_dto=user_read_dto,
@@ -634,7 +670,7 @@ def get_role_management_handler(
     async def assign_role(data: UserRoleSchema, service: UserServiceType) -> SQLAUserT:
         """Assign a role to a user."""
 
-        return cast(SQLAUserT, await service.assign_role(data.user_id, data.role_id))
+        return cast("SQLAUserT", await service.assign_role(data.user_id, data.role_id))
 
     @put(
         return_dto=user_read_dto,
@@ -647,6 +683,6 @@ def get_role_management_handler(
     async def revoke_role(data: UserRoleSchema, service: UserServiceType) -> SQLAUserT:
         """Revoke a role from a user."""
 
-        return cast(SQLAUserT, await service.revoke_role(data.user_id, data.role_id))
+        return cast("SQLAUserT", await service.revoke_role(data.user_id, data.role_id))
 
     return Router(path_prefix, route_handlers=[create_role, assign_role, revoke_role, update_role, delete_role])

@@ -1,7 +1,7 @@
 import asyncio
-from collections.abc import AsyncIterator, Generator
+from collections.abc import AsyncIterator, Callable, Generator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 from uuid import UUID
 
@@ -11,19 +11,22 @@ from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO, SQLAlchemyDT
 from httpx_oauth.oauth2 import OAuth2
 from litestar.dto import DataclassDTO
 from litestar.middleware.session.server_side import ServerSideSessionConfig
-from litestar.security.jwt import JWTAuth, JWTCookieAuth
-from litestar.security.session_auth import SessionAuth
 from pytest_mock import MockerFixture
 from sqlalchemy import ForeignKey, Text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from litestar_users import LitestarUsersConfig
-from litestar_users.adapter.sqlalchemy.mixins import (
+from litestar_users.config import (
+    CurrentUserHandlerConfig,
+    JWTAuthConfig,
+    JWTCookieAuthConfig,
+    OAuth2HandlerConfig,
+)
+from litestar_users.mixins import (
     SQLAlchemyOAuthAccountMixin,
     SQLAlchemyUserMixin,
 )
-from litestar_users.config import CurrentUserHandlerConfig, OAuth2HandlerConfig
 from litestar_users.service import BaseUserService
 from tests.conftest import password_manager
 from tests.constants import ENCODING_SECRET
@@ -187,17 +190,16 @@ def oauth_client() -> OAuth2:
 
 @pytest.fixture(
     params=[
-        pytest.param(SessionAuth, id="session"),
-        pytest.param(JWTAuth, id="jwt"),
-        pytest.param(JWTCookieAuth, id="jwt_cookie"),
+        pytest.param(ServerSideSessionConfig(), id="session"),
+        pytest.param(JWTAuthConfig(), id="jwt"),
+        pytest.param(JWTCookieAuthConfig(), id="jwt_cookie"),
     ],
 )
 def litestar_users_config(
     request: pytest.FixtureRequest, oauth_client: OAuth2, user_service: UserService, models: dict[str, Any]
 ) -> LitestarUsersConfig:
     return LitestarUsersConfig(  # pyright: ignore
-        auth_backend_class=request.param,
-        session_backend_config=ServerSideSessionConfig(),
+        auth_config=request.param,
         secret=ENCODING_SECRET,
         user_model=models["User"],  # pyright: ignore
         user_read_dto=models["UserReadDTO"],

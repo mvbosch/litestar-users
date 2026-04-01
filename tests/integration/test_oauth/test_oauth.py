@@ -4,7 +4,7 @@ import pytest
 from httpx_oauth.oauth2 import BaseOAuth2
 from litestar import status_codes
 from litestar.exceptions import HTTPException
-from litestar.security.session_auth import SessionAuth
+from litestar.middleware.session.base import BaseBackendConfig
 
 from litestar_users.config import LitestarUsersConfig
 from litestar_users.service import generate_state_token
@@ -152,7 +152,7 @@ class TestCallback:
         assert data["email"] == generic_user.email
         assert data["username"] == generic_user.username
         assert data["id"] == str(generic_user.id)
-        if litestar_users_config.auth_backend_class == SessionAuth:
+        if isinstance(litestar_users_config.auth_config, BaseBackendConfig):
             assert client.get_session_data()["user_id"] == str(generic_user.id)
         else:
             assert "Authorization" in response.headers

@@ -8,25 +8,19 @@ from advanced_alchemy.base import UUIDBase
 from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO, SQLAlchemyDTOConfig
 from litestar.dto import DataclassDTO
 from litestar.middleware.session.server_side import ServerSideSessionConfig
-from litestar.security.jwt import JWTAuth, JWTCookieAuth
-from litestar.security.session_auth import SessionAuth
 from sqlalchemy import ForeignKey, Text, Uuid
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from litestar_users import LitestarUsersConfig
-from litestar_users.adapter.sqlalchemy.mixins import (
-    SQLAlchemyRoleMixin,
-    SQLAlchemyUserMixin,
-)
-from litestar_users.config import RoleManagementHandlerConfig
+from litestar_users.config import JWTAuthConfig, JWTCookieAuthConfig, RoleManagementHandlerConfig
 from litestar_users.guards import roles_accepted, roles_required
-from litestar_users.service import BaseUserService
-from tests.conftest import password_manager
 from litestar_users.mixins import (
     SQLAlchemyRoleMixin,
     SQLAlchemyUserMixin,
 )
+from litestar_users.service import BaseUserService
+from tests.conftest import password_manager
 from tests.constants import ENCODING_SECRET
 from tests.utils import MockAuth
 
@@ -149,15 +143,14 @@ def generic_user(models: dict[str, Any]) -> Any:
 
 @pytest.fixture(
     params=[
-        pytest.param(SessionAuth, id="session"),
-        pytest.param(JWTAuth, id="jwt"),
-        pytest.param(JWTCookieAuth, id="jwt_cookie"),
+        pytest.param(ServerSideSessionConfig(), id="session"),
+        pytest.param(JWTAuthConfig(), id="jwt"),
+        pytest.param(JWTCookieAuthConfig(), id="jwt_cookie"),
     ],
 )
 def litestar_users_config(request: pytest.FixtureRequest, models: dict[str, Any]) -> LitestarUsersConfig:
     return LitestarUsersConfig(  # pyright: ignore
-        auth_backend_class=request.param,
-        session_backend_config=ServerSideSessionConfig(),
+        auth_config=request.param,
         secret=ENCODING_SECRET,
         user_model=models["User"],  # pyright: ignore
         user_read_dto=models["UserReadDTO"],

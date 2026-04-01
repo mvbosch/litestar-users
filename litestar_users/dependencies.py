@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from advanced_alchemy.extensions.litestar.plugins import SQLAlchemyAsyncConfig
 from litestar.exceptions import ImproperlyConfiguredException
@@ -11,7 +11,7 @@ from litestar_users.repository import (
 )
 from litestar_users.utils import get_litestar_users_plugin, get_sqlalchemy_plugin
 
-__all__ = ["provide_user_service"]
+__all__ = ["provide_current_user", "provide_user_service"]
 
 
 if TYPE_CHECKING:
@@ -19,6 +19,23 @@ if TYPE_CHECKING:
     from litestar.datastructures import State
 
     from litestar_users.service import BaseUserService
+
+
+def provide_current_user(request: Request) -> Any:
+    """Expose ``request.user`` as a named dependency.
+
+    Register this at the app level::
+
+        Provide(provide_current_user, sync_to_thread=False)
+
+    Then declare the desired user type on each handler::
+
+        async def handler(current_user: MyUser) -> ...:  # auth required
+        async def handler(
+            current_user: Annotated[MyUser | AnonymousUser, no_validation],
+        ) -> ...:  # anonymous OK
+    """
+    return request.user
 
 
 def provide_user_service(state: State, request: Request) -> BaseUserService:

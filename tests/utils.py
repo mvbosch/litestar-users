@@ -1,11 +1,9 @@
-from __future__ import annotations
-
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from litestar.exceptions import NotAuthorizedException
-from litestar.security.jwt import JWTAuth, JWTCookieAuth, Token
-from litestar.security.session_auth import SessionAuth
+from litestar.middleware.session.base import BaseBackendConfig
+from litestar.security.jwt import Token
 
 from .constants import ENCODING_SECRET
 
@@ -36,9 +34,9 @@ class MockAuth:
 
         Works with both session and JWT backends.
         """
-        if self.config.auth_backend_class == SessionAuth:
+        if isinstance(self.config.auth_config, BaseBackendConfig):
             self.client.set_session_data({"user_id": user_id})
-        elif self.config.auth_backend_class == JWTAuth or self.config.auth_backend_class == JWTCookieAuth:
+        else:
             token = create_jwt(str(user_id))
             self.client.headers["Authorization"] = "Bearer " + token
 
