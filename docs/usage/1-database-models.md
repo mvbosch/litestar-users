@@ -58,7 +58,6 @@ from litestar_users.mixins import SQLAlchemyUserMixin, SQLAlchemyRoleMixin
 from sqlalchemy import Column, ForeignKey, Table
 from sqlalchemy.orm import Mapped, relationship
 
-
 user_role = Table(
     "user_role",
     orm_registry.metadata,
