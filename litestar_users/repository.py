@@ -23,15 +23,6 @@ class SQLAlchemyUserRepository(SQLAlchemyAsyncRepository[SQLAUserT], Generic[SQL
         self.model_type = model_type
         super().__init__(session=session, **kwargs)
 
-    async def _update(self, user: SQLAUserT, data: dict[str, Any]) -> SQLAUserT:
-        for key, value in data.items():
-            setattr(user, key, value)
-
-        if self.auto_commit:
-            await self.session.commit()
-
-        return user
-
 
 class SQLAlchemyOAuthAccountRepository(
     SQLAlchemyAsyncRepository[SQLAOAuthAccountT], Generic[SQLAOAuthAccountT, SQLAUserT]

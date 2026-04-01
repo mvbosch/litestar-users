@@ -230,7 +230,8 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
             data.password, str(user.password_hash) if user.password_hash is not None else None
         )
         if new_password_hash is not None:
-            user = await self.user_repository._update(user, {"password_hash": new_password_hash})
+            user.password_hash = new_password_hash  # type: ignore[assignment]
+            await self.user_repository.update(user)
 
         if not password_verified or not should_proceed:
             return None
