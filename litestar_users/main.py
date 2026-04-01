@@ -86,9 +86,6 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
                 "SQLAUserT": self._config.user_model,
                 "SQLARoleT": self._config.role_model,
                 "SQLAOAuthAccountT": self._config.oauth_account_model,
-                "role_create_dto": self._config.role_create_dto,
-                "role_read_dto": self._config.role_read_dto,
-                "role_update_dto": self._config.role_update_dto,
                 "user_read_dto": self._config.user_read_dto,
                 "user_update_dto": self._config.user_update_dto,
                 "user_registration_dto": self._config.user_registration_dto,
@@ -97,6 +94,15 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
                 "UUID": UUID,
             }
         )
+        if self._config.role_management_handler_config:
+            app_config.signature_namespace.update(
+                {
+                    "role_create_dto": self._config.role_management_handler_config.role_create_dto,
+                    "role_read_dto": self._config.role_management_handler_config.role_read_dto,
+                    "role_update_dto": self._config.role_management_handler_config.role_update_dto,
+                }
+            )
+
         app_config.state.update({"litestar_users_config": self._config})
 
         # Register current_user dependency unless the app already provides one
@@ -299,9 +305,9 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
                     revoke_role_path=self._config.role_management_handler_config.revoke_role_path,
                     guards=self._config.role_management_handler_config.guards,
                     identifier_uri=self.get_role_identifier_uri(),
-                    role_create_dto=self._config.role_create_dto,  # type: ignore
-                    role_read_dto=self._config.role_read_dto,  # type: ignore
-                    role_update_dto=self._config.role_update_dto,  # type: ignore
+                    role_create_dto=self._config.role_management_handler_config.role_create_dto,
+                    role_read_dto=self._config.role_management_handler_config.role_read_dto,
+                    role_update_dto=self._config.role_management_handler_config.role_update_dto,
                     user_read_dto=self._config.user_read_dto,
                     opt=self._config.role_management_handler_config.opt,
                     tags=self._config.role_management_handler_config.tags,

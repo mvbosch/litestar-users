@@ -157,12 +157,12 @@ def litestar_users_config(request: pytest.FixtureRequest, models: dict[str, Any]
         user_registration_dto=models["UserRegistrationDTO"],
         user_update_dto=models["UserUpdateDTO"],
         role_model=models["Role"],  # pyright: ignore
-        role_create_dto=models["RoleCreateDTO"],
-        role_read_dto=models["RoleReadDTO"],
-        role_update_dto=models["RoleUpdateDTO"],
         user_service_class=UserService,
         role_management_handler_config=RoleManagementHandlerConfig(
-            guards=[roles_accepted("administrator"), roles_required("administrator")]
+            role_create_dto=models["RoleCreateDTO"],
+            role_read_dto=models["RoleReadDTO"],
+            role_update_dto=models["RoleUpdateDTO"],
+            guards=[roles_accepted("administrator"), roles_required("administrator")],
         ),
     )
 

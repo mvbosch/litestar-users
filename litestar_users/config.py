@@ -4,35 +4,29 @@ from dataclasses import dataclass, field, is_dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Generic, Literal
 
-from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO
-from litestar.dto import DataclassDTO, MsgspecDTO
 from litestar.exceptions import ImproperlyConfiguredException
-from litestar.middleware.session.base import BaseBackendConfig
-from litestar.types import Guard
-
-try:
-    from litestar.plugins.pydantic import PydanticDTO
-except ImportError:
-    PydanticDTO = Any  # type: ignore[assignment,misc]
 
 from litestar_users.protocols import SQLAOAuthAccountT, SQLARoleT, SQLAUserT
 from litestar_users.repository import SQLAlchemyUserRepository
 from litestar_users.schema import AuthenticationSchema
-from litestar_users.service import BaseUserService
-
-try:
-    from httpx_oauth.oauth2 import BaseOAuth2
-except ModuleNotFoundError:
-    BaseOAuth2 = Any  # type: ignore[assignment,misc]
 
 if TYPE_CHECKING:
     from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO
-    from litestar.contrib.pydantic import PydanticDTO
     from litestar.dto import DataclassDTO, MsgspecDTO
     from litestar.middleware.session.base import BaseBackendConfig
     from litestar.types import Guard
 
     from litestar_users.service import BaseUserService
+
+    try:
+        from litestar.plugins.pydantic import PydanticDTO
+    except ImportError:
+        PydanticDTO = Any  # type: ignore[assignment,misc]
+
+    try:
+        from httpx_oauth.oauth2 import BaseOAuth2
+    except ImportError:
+        BaseOAuth2 = Any  # type: ignore[assignment,misc]
 
 __all__ = [
     "AuthHandlerConfig",
@@ -200,6 +194,12 @@ class RoleManagementHandlerConfig:
     Passing an instance to `LitestarUsersConfig` will automatically take care of handler registration on the app.
     """
 
+    role_create_dto: type[SQLAlchemyDTO]
+    """A `SQLAlchemyDTO` subclass for role creation."""
+    role_read_dto: type[SQLAlchemyDTO]
+    """A `SQLAlchemyDTO` subclass for role reads."""
+    role_update_dto: type[SQLAlchemyDTO]
+    """A `SQLAlchemyDTO` subclass for role updates."""
     path_prefix: str = "/users/roles"
     """The prefix for the router path."""
     assign_role_path: str = "/assign"
@@ -274,7 +274,7 @@ class LitestarUsersConfig(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):
     """A subclass of a `User` ORM model."""
     user_service_class: type[BaseUserService]
     """A subclass of [BaseUserService][litestar_users.service.BaseUserService]."""
-    user_registration_dto: type[DataclassDTO | MsgspecDTO | PydanticDTO]  # pyright: ignore[assignment]
+    user_registration_dto: type[DataclassDTO | MsgspecDTO | PydanticDTO]  # pyright: ignore[reportInvalidTypeForm, assignment]
     """DTO class user for user registration."""
     user_read_dto: type[SQLAlchemyDTO]
     """A `User` model based SQLAlchemy DTO class."""
@@ -305,24 +305,6 @@ class LitestarUsersConfig(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):
     """A `OAuthAccount` ORM model."""
     role_model: type[SQLARoleT] | None = None
     """A `Role` ORM model.
-
-    Notes:
-        - Required if `role_management_handler_config` is set.
-    """
-    role_create_dto: type[SQLAlchemyDTO] | None = None
-    """A `SQLAlchemyDTO` based on a `Role` ORM model.
-
-    Notes:
-        - Required if `role_management_handler_config` is set.
-    """
-    role_read_dto: type[SQLAlchemyDTO] | None = None
-    """A `SQLAlchemyDTO` based on a `Role` ORM model.
-
-    Notes:
-        - Required if `role_management_handler_config` is set.
-    """
-    role_update_dto: type[SQLAlchemyDTO] | None = None
-    """A `SQLAlchemyDTO` based on a `Role` ORM model.
 
     Notes:
         - Required if `role_management_handler_config` is set.
@@ -398,8 +380,7 @@ class LitestarUsersConfig(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):
 
         - A session backend must be configured if `auth_backend_class` is `SessionAuth`.
         - At least one route handler must be configured.
-        - `role_model`, `role_create_dto`, `role_read_dto` and `role_update_dto` are required fields if
-            `role_management_handler_config` is configured.
+        - `role_model` is a required field on `LitestarUsersConfig` if `role_management_handler_config` is set.
         """
         handler_configs = [
             "auth_handler_config",
