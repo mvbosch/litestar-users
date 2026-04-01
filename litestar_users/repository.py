@@ -50,10 +50,9 @@ class SQLAlchemyOAuthAccountRepository(
         if not hasattr(user, "oauth_accounts"):
             raise ImproperlyConfiguredException("User.oauth_accounts is not set")
 
-        user.oauth_accounts.append(self.model_type(**data))  # pyright: ignore
-
-        if self.auto_commit:
-            await self.session.commit()
+        new_account = self.model_type(**data)
+        user.oauth_accounts.append(new_account)  # pyright: ignore
+        await self.add(new_account)
 
         return user
 
@@ -72,9 +71,7 @@ class SQLAlchemyOAuthAccountRepository(
 
         for key, value in data.items():
             setattr(oauth_account, key, value)
-
-        if self.auto_commit:
-            await self.session.commit()
+        await self.update(oauth_account)
 
         return user
 
@@ -92,33 +89,3 @@ class SQLAlchemyRoleRepository(SQLAlchemyAsyncRepository[SQLARoleT], Generic[SQL
         """
         self.model_type = model_type
         super().__init__(session=session)
-
-    async def assign_role(self, user: SQLAUserT, role: SQLARoleT) -> SQLAUserT:
-        """Add a role to a user.
-
-        Args:
-            user: The user to receive the role.
-            role: The role to add to the user.
-        """
-        if not hasattr(user, "roles"):
-            raise ImproperlyConfiguredException("User.roles is not set")
-        user.roles.append(role)  # pyright: ignore
-
-        if self.auto_commit:
-            await self.session.commit()
-
-        return user
-
-    async def revoke_role(self, user: SQLAUserT, role: SQLARoleT) -> SQLAUserT:
-        """Revoke a role from a user.
-
-        Args:
-            user: The user to revoke the role from.
-            role: The role to revoke from the user.
-        """
-        if not hasattr(user, "roles"):
-            raise ImproperlyConfiguredException("User.roles is not set")
-        user.roles.remove(role)  # pyright: ignore
-        if self.auto_commit:
-            await self.session.commit()
-        return user

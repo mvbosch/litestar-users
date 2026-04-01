@@ -530,7 +530,8 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
 
         if isinstance(user.roles, list) and role in user.roles:  # pyright: ignore
             raise IntegrityError(f"user already has role '{role.name}'")
-        return await self.role_repository.assign_role(user, role)
+        user.roles.append(role)  # pyright: ignore
+        return await self.user_repository.update(user)
 
     async def revoke_role(self, user_id: UUID | int, role_id: UUID | int) -> SQLAUserT:
         """Revoke a role from a user.
@@ -549,7 +550,8 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
 
         if isinstance(user.roles, list) and role not in user.roles:  # pyright: ignore
             raise IntegrityError(f"user does not have role '{role.name}'")
-        return await self.role_repository.revoke_role(user, role)
+        user.roles.remove(role)  # pyright: ignore
+        return await self.user_repository.update(user)
 
     async def get_by_oauth_account(self, oauth: str, account_id: str, request: Request | None = None) -> SQLAUserT:
         """Get a user by OAuth account.
