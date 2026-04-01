@@ -50,73 +50,10 @@
 
 ## Route handler configs
 
-::: litestar_users.config.AuthHandlerConfig
-    options:
-        members:
-            - login_path
-            - logout_path
-            - opt
-            - tags
-            - user_read_dto
+See [Route Handler Configurations](./2-route-handler-configs.md) for the full reference.
 
-::: litestar_users.config.CurrentUserHandlerConfig
-    options:
-        members:
-            - path
-            - opt
-            - tags
-            - user_read_dto
+## Anonymous access
 
-::: litestar_users.config.PasswordResetHandlerConfig
-    options:
-        members:
-            - forgot_path
-            - reset_path
-            - tags
+::: litestar_users.anonymous.AnonymousUser
 
-::: litestar_users.config.RegisterHandlerConfig
-    options:
-        members:
-            - path
-            - tags
-
-::: litestar_users.config.RoleManagementHandlerConfig
-    options:
-        members:
-            - role_create_dto
-            - role_read_dto
-            - role_update_dto
-            - path_prefix
-            - assign_role_path
-            - revoke_role_path
-            - guards
-            - opt
-            - tags
-
-::: litestar_users.config.UserManagementHandlerConfig
-    options:
-        members:
-            - path_prefix
-            - guards
-            - opt
-            - tags
-            - user_read_dto
-
-::: litestar_users.config.VerificationHandlerConfig
-    options:
-        members:
-            - path
-            - tags
-
-::: litestar_users.config.OAuth2HandlerConfig
-    options:
-        members:
-            - oauth_client
-            - state_secret
-            - path
-            - redirect_url
-            - associate_by_email
-            - is_verified_by_default
-            - guards
-            - tags
-            - user_read_dto
+::: litestar_users.anonymous.no_validation

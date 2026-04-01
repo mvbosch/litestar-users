@@ -123,7 +123,7 @@ auth_config = JWTAuthConfig()
 
 ## Anonymous users
 
-By default every route (except those in `auth_exclude_paths`) requires a valid session or token. If you need a route to be accessible to unauthenticated callers without excluding it globally, Litestar-Users provides [`AnonymousUser`][litestar_users.AnonymousUser] and [`no_validation`][litestar_users.no_validation].
+By default every route (except those in `auth_exclude_paths`) requires a valid session or token. If you need a route to be accessible to unauthenticated callers without excluding it globally, Litestar-Users provides [`AnonymousUser`][litestar_users.anonymous.AnonymousUser] and [`no_validation`][litestar_users.anonymous.no_validation].
 
 Declare `current_user` as a union that includes `AnonymousUser` on any handler that should accept unauthenticated requests. The middleware will set `request.user` to an `AnonymousUser` instance instead of raising a 401, and you can distinguish the two cases with `isinstance`:
 

@@ -1,6 +1,6 @@
 # Data transfer objects
 
-The user registration DTO can be an instance of either [DataclassDTO][litestar.dto.DataclassDTO], [MsgspecDTO][litestar.dto.msgspec_dto.MsgspecDTO] or [PydanticDTO][litestar.dto.pydantic_dto.PydanticDTO].
+The user registration DTO can be an instance of either [DataclassDTO][litestar.dto.dataclass_dto.DataclassDTO], [MsgspecDTO][litestar.dto.msgspec_dto.MsgspecDTO] or [PydanticDTO][litestar.plugins.pydantic.PydanticDTO].
 
 A few constraints are enforced by `LitestarUsersConfig` at startup:
 

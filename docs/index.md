@@ -8,10 +8,10 @@ Litestar-Users is an authentication, authorization and user management package f
 - Customizable pre- and post-operation hooks
 - Optional RBAC (Role based access control)
 - Pre-configured route handlers for:
-  - Authentication
-  - Registration and verification
-  - Password recovery
-  - Administrative user and role management
+    - Authentication
+    - Registration and verification
+    - Password recovery
+    - Administrative user and role management
 
 ## Installation
 

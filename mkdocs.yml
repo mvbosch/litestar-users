@@ -39,8 +39,9 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          import:
-          - https://litestar.dev/objects.inv
+          inventories:
+          - https://docs.litestar.dev/latest/objects.inv
+          - https://advanced-alchemy.litestar.dev/latest/objects.inv
           options:
             heading_level: 3
             members: []

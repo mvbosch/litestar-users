@@ -2,7 +2,7 @@
 
 ## The user model
 
-The [SQLAlchemyUserMixin][litestar_users.adapter.sqlalchemy.mixins.SQLAlchemyUserMixin] provides the following columns:
+The [SQLAlchemyUserMixin][litestar_users.mixins.SQLAlchemyUserMixin] provides the following columns:
 
 * `email`: str
 * `password_hash`: str
@@ -12,7 +12,7 @@ The [SQLAlchemyUserMixin][litestar_users.adapter.sqlalchemy.mixins.SQLAlchemyUse
 ### SQLAlchemy User
 
 !!! important
-    Litestar-Users is reliant on the [SQLAlchemyPlugin][advanced_alchemy.extensions.litestar.plugins.SQLAlchemyInitPlugin] for session management and dependency injection, this ensures that no more than one SQLAlchemy session is spun up per request lifecycle.
+    Litestar-Users is reliant on the [SQLAlchemyInitPlugin][advanced_alchemy.extensions.litestar.SQLAlchemyInitPlugin] for session management and dependency injection, this ensures that no more than one SQLAlchemy session is spun up per request lifecycle.
 
 ```python
 from advanced_alchemy.base import UUIDBase
