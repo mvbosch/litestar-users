@@ -71,7 +71,7 @@ def _create_jwt_login_response(
         raise RuntimeError("_create_jwt_login_response called with non-JWT auth config")
 
     token = Token(
-        sub=str(user.id),  # type: ignore[attr-defined]
+        sub=str(user.id),
         exp=datetime.now(timezone.utc) + auth_config.token_expiration,
     ).encode(secret=config.secret, algorithm=auth_config.algorithm)
 
@@ -93,7 +93,7 @@ def _create_jwt_login_response(
         )
 
     return Response(
-        content=cast("SQLAUserT", user),
+        content=user,
         status_code=status_codes.HTTP_201_CREATED,
         media_type=MediaType.JSON,
         headers=headers,
@@ -480,7 +480,7 @@ def get_current_user_handler(
         service: UserServiceType,
     ) -> SQLAUserT:
         """Update the current user."""
-        data.id = request.user.id  # type: ignore[assignment]
+        data.id = request.user.id  # pyright: ignore[reportAttributeAccessIssue]
         return cast("SQLAUserT", await service.update_user(data=data))
 
     return Router(path="/", route_handlers=[get_current_user, update_current_user])

@@ -12,7 +12,6 @@ from litestar import Litestar, Request
 from litestar.dto import DataclassDTO
 from litestar.exceptions import NotAuthorizedException
 from litestar.middleware.session.server_side import ServerSideSessionConfig
-from litestar.security.session_auth import SessionAuth
 from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -57,7 +56,7 @@ class UserRegistrationDTO(DataclassDTO[UserRegistrationSchema]):
 
 
 class UserReadDTO(SQLAlchemyDTO[User]):
-    config = SQLAlchemyDTOConfig(exclude={"login_count"})
+    config = SQLAlchemyDTOConfig(exclude={"password_hash", "login_count"})
 
 
 class UserUpdateDTO(SQLAlchemyDTO[User]):
@@ -93,8 +92,7 @@ async def on_startup() -> None:
 
 litestar_users = LitestarUsersPlugin(
     config=LitestarUsersConfig(
-        auth_backend_class=SessionAuth,
-        session_backend_config=ServerSideSessionConfig(),
+        auth_config=ServerSideSessionConfig(),
         secret=ENCODING_SECRET,
         user_model=User,  # pyright: ignore
         user_read_dto=UserReadDTO,

@@ -105,8 +105,8 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
         if user_exists:
             raise IntegrityError(f"{self.user_auth_identifier} already associated with an account")
 
-        user.is_verified = verify
-        user.is_active = activate
+        user.is_verified = verify  # type: ignore[assignment]
+        user.is_active = activate  # type: ignore[assignment]
 
         return await self.user_repository.add(user)
 
@@ -188,7 +188,7 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
         """
         # password is not hashed yet, despite attribute name.
         if data.password_hash:
-            data.password_hash = self.password_manager.hash(data.password_hash)
+            data.password_hash = self.password_manager.hash(str(data.password_hash))  # type: ignore[assignment]
 
         return await self.user_repository.update(data)
 
@@ -227,7 +227,7 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
             return None
 
         password_verified, new_password_hash = self.password_manager.verify_and_update(
-            data.password, user.password_hash
+            data.password, str(user.password_hash) if user.password_hash is not None else None
         )
         if new_password_hash is not None:
             user = await self.user_repository._update(user, {"password_hash": new_password_hash})
@@ -262,7 +262,7 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
         Notes:
             - The user verification flow is not initiated when `require_verification_on_registration` is set to `False`.
         """
-        token = self.generate_token(user.id, aud="verify")
+        token = self.generate_token(user.id, aud="verify")  # type: ignore[arg-type]
         await self.send_verification_token(user, token)
 
     async def send_verification_token(self, user: SQLAUserT, token: str) -> None:
@@ -312,7 +312,7 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
         if user is None:
             self.generate_token(uuid4(), aud="reset_password")
             return
-        token = self.generate_token(user.id, aud="reset_password")
+        token = self.generate_token(user.id, aud="reset_password")  # type: ignore[arg-type]
         await self.send_password_reset_token(user, token)
 
     async def send_password_reset_token(self, user: SQLAUserT, token: str) -> None:
@@ -571,7 +571,7 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
         oauth2 = await self.oauth2_repository.get_one(oauth_name=oauth, account_id=account_id)
         if oauth2 is None:
             raise NotFoundError("OAuth account not found")
-        user = await self.get_user(oauth2.user_id, load=load)
+        user = await self.get_user(oauth2.user_id, load=load)  # type: ignore[arg-type]
         if user is None:
             raise NotFoundError("User not found")
 

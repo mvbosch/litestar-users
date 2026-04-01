@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any, cast
+from typing import Any
 
 import jwt
 
@@ -26,12 +26,9 @@ def decode_jwt(
     algorithms: list[str] | None = None,
 ) -> dict[str, Any]:
     _algorithms = algorithms or [JWT_ALGORITHM]
-    return cast(
-        "dict[str, Any]",
-        jwt.decode(
-            encoded_jwt,
-            secret,
-            audience=audience,
-            algorithms=_algorithms,
-        ),
+    return jwt.decode(
+        encoded_jwt,
+        secret,
+        audience=audience,
+        algorithms=_algorithms,
     )

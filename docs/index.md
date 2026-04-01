@@ -23,4 +23,4 @@ Litestar-Users is an authentication, authorization and user management package f
 
 ## Full example
 
-Example application code can be viewed [here](https://github.com/LonelyVikingMichael/litestar-users/blob/main/examples/basic.py).
+Example application code can be viewed in the [examples directory](https://github.com/LonelyVikingMichael/litestar-users/blob/main/examples/basic.py).

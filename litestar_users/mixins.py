@@ -1,4 +1,3 @@
-
 from typing import TypeVar
 
 from sqlalchemy.orm import Mapped, declarative_mixin, mapped_column

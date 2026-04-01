@@ -426,7 +426,7 @@ class LitestarUsersConfig(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):
         # ensure password is mapped correctly
         self.user_update_dto.config.rename_fields.update({"password_hash": "password"})
 
-        for field_ in self.user_registration_dto.generate_field_definitions(self.user_registration_dto.model_type):  # type: ignore[misc]
+        for field_ in self.user_registration_dto.generate_field_definitions(self.user_registration_dto.model_type):  # pyright: ignore[reportGeneralTypeIssues]
             if field_.name in USER_CREATE_DTO_EXCLUDED_FIELDS:
                 raise ImproperlyConfiguredException(
                     f"user_registration_dto fields must exclude {USER_CREATE_DTO_EXCLUDED_FIELDS}"

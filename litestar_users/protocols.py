@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, Protocol, TypeVar, runtime_checkable
-from uuid import UUID
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
 
 from advanced_alchemy.base import ModelProtocol
 from sqlalchemy.orm import Mapped, MappedClassProtocol
+
+if TYPE_CHECKING:
+    from datetime import datetime
+    from uuid import UUID
+
 
 __all__ = [
     "SQLAOAuthAccountT",

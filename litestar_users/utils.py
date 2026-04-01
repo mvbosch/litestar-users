@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 def get_litestar_users_plugin(app: Litestar) -> LitestarUsersPlugin:
     """Get the LitestarUsersPlugin from the Litestar application."""
-    from litestar_users import LitestarUsersPlugin
+    from litestar_users import LitestarUsersPlugin  # noqa: PLC0415
 
     try:
         return app.plugins.get(LitestarUsersPlugin)

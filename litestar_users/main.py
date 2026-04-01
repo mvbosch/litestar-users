@@ -89,7 +89,7 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
                 "user_update_dto": self._config.user_update_dto,
                 "user_registration_dto": self._config.user_registration_dto,
                 "DTOData": DTOData,
-                "UserRegisterT": self._config.user_registration_dto.model_type,  # type: ignore[misc]
+                "UserRegisterT": self._config.user_registration_dto.model_type,  # pyright: ignore[reportGeneralTypeIssues]
                 "UUID": UUID,
             }
         )
@@ -169,7 +169,7 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
             scheme = SecurityScheme(
                 type="apiKey",
                 name=auth_config.key,
-                security_scheme_in="cookie",  # type: ignore[arg-type]
+                security_scheme_in="cookie",
                 description="Session cookie authentication.",
             )
         elif isinstance(auth_config, JWTCookieAuthConfig):
@@ -178,7 +178,7 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
                 type="http",
                 scheme="Bearer",
                 name=auth_config.cookie_key,
-                security_scheme_in="cookie",  # type: ignore[arg-type]
+                security_scheme_in="cookie",
                 bearer_format="JWT",
                 description="JWT cookie-based authentication and authorization.",
             )
@@ -198,7 +198,7 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
         else:
             app_config.openapi_config.components = [components, existing_components]
 
-        security_requirement = {scheme_name: []}
+        security_requirement: dict[str, list[str]] = {scheme_name: []}
         existing_security = app_config.openapi_config.security
         if isinstance(existing_security, list):
             app_config.openapi_config.security = [*existing_security, security_requirement]

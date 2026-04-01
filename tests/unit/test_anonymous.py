@@ -32,6 +32,8 @@ from litestar_users.middleware import (
     LitestarUsersJWTMiddleware,
     LitestarUsersSessionMiddlewareWrapper,
 )
+from litestar_users.middleware import jwt as jwt_mw
+from litestar_users.middleware import session as session_mw
 
 
 def _log_exception(exc: Exception, scope: Any) -> None:
@@ -100,8 +102,6 @@ def _build_jwt_app(
     *,
     anonymous_ok: bool,
 ) -> Litestar:
-    from litestar_users.middleware import jwt as jwt_mw
-
     monkeypatch.setattr(jwt_mw, "_get_user_from_sub", mock_user_lookup)
 
     handler = _me_handler_anonymous_ok() if anonymous_ok else _me_handler_auth_required()
@@ -146,8 +146,6 @@ def _build_session_app(
     *,
     anonymous_ok: bool,
 ) -> Litestar:
-    from litestar_users.middleware import session as session_mw
-
     monkeypatch.setattr(session_mw, "_get_user_from_session", mock_user_lookup)
 
     handler = _me_handler_anonymous_ok() if anonymous_ok else _me_handler_auth_required()
@@ -171,7 +169,6 @@ def _build_session_app(
 
 class TestAnonymousUser:
     def test_defaults(self) -> None:
-
         user = AnonymousUser()
         assert user.id is Empty
         assert user.is_active is False
