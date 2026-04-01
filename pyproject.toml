@@ -66,6 +66,7 @@ addopts = "--ignore=examples"
 asyncio_mode = "auto"
 
 [tool.pyright]
+pythonVersion = "3.10"
 include = ["litestar_users", "tests", "examples"]
 
 [tool.slotscheck]
