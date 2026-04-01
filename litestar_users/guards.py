@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from litestar.exceptions import NotAuthorizedException
+from litestar.exceptions.http_exceptions import PermissionDeniedException
 
 __all__ = ["roles_accepted", "roles_required"]
 
@@ -27,7 +27,7 @@ def roles_accepted(*roles: str) -> Guard:
         """Authorize a request if any of the user's roles matches any of the supplied roles."""
         if any(role.name in roles for role in connection.user.roles):
             return
-        raise NotAuthorizedException()
+        raise PermissionDeniedException()
 
     return roles_accepted_guard
 
@@ -44,6 +44,6 @@ def roles_required(*roles: str) -> Guard:
         user_role_names = [role.name for role in connection.user.roles]
         if all(role in user_role_names for role in roles):
             return
-        raise NotAuthorizedException()
+        raise PermissionDeniedException()
 
     return roles_required_guard

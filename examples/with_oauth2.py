@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any
 
@@ -11,23 +9,21 @@ from httpx_oauth.clients.google import GoogleOAuth2
 from litestar import Litestar, Request
 from litestar.dto import DataclassDTO
 from litestar.middleware.session.server_side import ServerSideSessionConfig
-from litestar.security.session_auth import SessionAuth
 from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from litestar_users import LitestarUsersConfig, LitestarUsersPlugin
-from litestar_users.adapter.sqlalchemy.mixins import SQLAlchemyOAuthAccountMixin, SQLAlchemyUserMixin
 from litestar_users.config import (
     AuthHandlerConfig,
     CurrentUserHandlerConfig,
     OAuth2HandlerConfig,
     PasswordResetHandlerConfig,
     RegisterHandlerConfig,
-    RoleManagementHandlerConfig,
     UserManagementHandlerConfig,
     VerificationHandlerConfig,
 )
-from litestar_users.guards import roles_accepted, roles_required
+from litestar_users.guards import roles_required
+from litestar_users.mixins import SQLAlchemyOAuthAccountMixin, SQLAlchemyUserMixin
 from litestar_users.password import PasswordManager
 from litestar_users.service import BaseUserService
 
@@ -66,7 +62,6 @@ class UserReadDTO(SQLAlchemyDTO[User]):
 class UserUpdateDTO(SQLAlchemyDTO[User]):
     # we'll update `login_count` in UserService.post_login_hook
     config = SQLAlchemyDTOConfig(exclude={"id", "login_count"}, partial=True)
-    # we'll update `login_count` in the UserService.post_login_hook
 
 
 class UserService(BaseUserService[User, Any, OAuthAccount]):  # type: ignore[type-var]
@@ -78,6 +73,7 @@ class UserService(BaseUserService[User, Any, OAuthAccount]):  # type: ignore[typ
 sqlalchemy_config = SQLAlchemyAsyncConfig(
     connection_string=DATABASE_URL,
     session_dependency_key="session",
+    before_send_handler="autocommit",
 )
 
 
@@ -93,8 +89,7 @@ async def on_startup() -> None:
 
 litestar_users_plugin = LitestarUsersPlugin(
     config=LitestarUsersConfig(
-        auth_backend_class=SessionAuth,
-        session_backend_config=ServerSideSessionConfig(),
+        auth_config=ServerSideSessionConfig(),
         secret=ENCODING_SECRET,
         user_model=User,  # pyright: ignore
         user_read_dto=UserReadDTO,
@@ -105,7 +100,6 @@ litestar_users_plugin = LitestarUsersPlugin(
         current_user_handler_config=CurrentUserHandlerConfig(),
         password_reset_handler_config=PasswordResetHandlerConfig(),
         register_handler_config=RegisterHandlerConfig(),
-        role_management_handler_config=RoleManagementHandlerConfig(guards=[roles_accepted("administrator")]),
         user_management_handler_config=UserManagementHandlerConfig(guards=[roles_required("administrator")]),
         verification_handler_config=VerificationHandlerConfig(),
         oauth_account_model=OAuthAccount,  # pyright: ignore

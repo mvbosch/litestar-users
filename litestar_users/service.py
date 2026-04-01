@@ -11,10 +11,10 @@ from litestar.security.jwt.token import Token
 from sqlalchemy import func
 
 import jwt
-from litestar_users.adapter.sqlalchemy.protocols import SQLAOAuthAccountT, SQLARoleT, SQLAUserT
 from litestar_users.exceptions import InvalidTokenException
 from litestar_users.jwt import decode_jwt, generate_jwt
 from litestar_users.password import PasswordManager
+from litestar_users.protocols import SQLAOAuthAccountT, SQLARoleT, SQLAUserT
 from litestar_users.schema import OAuth2AuthorizeSchema
 
 try:
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from litestar import Request
     from sqlalchemy.sql import ColumnElement
 
-    from litestar_users.adapter.sqlalchemy.repository import (
+    from litestar_users.repository import (
         SQLAlchemyOAuthAccountRepository,
         SQLAlchemyRoleRepository,
         SQLAlchemyUserRepository,
@@ -105,8 +105,8 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
         if user_exists:
             raise IntegrityError(f"{self.user_auth_identifier} already associated with an account")
 
-        user.is_verified = verify
-        user.is_active = activate
+        user.is_verified = verify  # type: ignore[assignment]
+        user.is_active = activate  # type: ignore[assignment]
 
         return await self.user_repository.add(user)
 
@@ -188,7 +188,7 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
         """
         # password is not hashed yet, despite attribute name.
         if data.password_hash:
-            data.password_hash = self.password_manager.hash(data.password_hash)
+            data.password_hash = self.password_manager.hash(str(data.password_hash))  # type: ignore[assignment]
 
         return await self.user_repository.update(data)
 
@@ -227,10 +227,11 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
             return None
 
         password_verified, new_password_hash = self.password_manager.verify_and_update(
-            data.password, user.password_hash
+            data.password, str(user.password_hash) if user.password_hash is not None else None
         )
         if new_password_hash is not None:
-            user = await self.user_repository._update(user, {"password_hash": new_password_hash})
+            user.password_hash = new_password_hash  # type: ignore[assignment]
+            await self.user_repository.update(user)
 
         if not password_verified or not should_proceed:
             return None
@@ -262,7 +263,7 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
         Notes:
             - The user verification flow is not initiated when `require_verification_on_registration` is set to `False`.
         """
-        token = self.generate_token(user.id, aud="verify")
+        token = self.generate_token(user.id, aud="verify")  # type: ignore[arg-type]
         await self.send_verification_token(user, token)
 
     async def send_verification_token(self, user: SQLAUserT, token: str) -> None:
@@ -312,7 +313,7 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
         if user is None:
             self.generate_token(uuid4(), aud="reset_password")
             return
-        token = self.generate_token(user.id, aud="reset_password")
+        token = self.generate_token(user.id, aud="reset_password")  # type: ignore[arg-type]
         await self.send_password_reset_token(user, token)
 
     async def send_password_reset_token(self, user: SQLAUserT, token: str) -> None:
@@ -529,7 +530,8 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
 
         if isinstance(user.roles, list) and role in user.roles:  # pyright: ignore
             raise IntegrityError(f"user already has role '{role.name}'")
-        return await self.role_repository.assign_role(user, role)
+        user.roles.append(role)  # pyright: ignore
+        return await self.user_repository.update(user)
 
     async def revoke_role(self, user_id: UUID | int, role_id: UUID | int) -> SQLAUserT:
         """Revoke a role from a user.
@@ -548,7 +550,8 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
 
         if isinstance(user.roles, list) and role not in user.roles:  # pyright: ignore
             raise IntegrityError(f"user does not have role '{role.name}'")
-        return await self.role_repository.revoke_role(user, role)
+        user.roles.remove(role)  # pyright: ignore
+        return await self.user_repository.update(user)
 
     async def get_by_oauth_account(self, oauth: str, account_id: str, request: Request | None = None) -> SQLAUserT:
         """Get a user by OAuth account.
@@ -571,7 +574,7 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
         oauth2 = await self.oauth2_repository.get_one(oauth_name=oauth, account_id=account_id)
         if oauth2 is None:
             raise NotFoundError("OAuth account not found")
-        user = await self.get_user(oauth2.user_id, load=load)
+        user = await self.get_user(oauth2.user_id, load=load)  # type: ignore[arg-type]
         if user is None:
             raise NotFoundError("User not found")
 
@@ -627,7 +630,7 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
                 if existing_oauth_account.account_id == account_id and existing_oauth_account.oauth_name == oauth_name:
                     user = await self.oauth2_repository.update_oauth_account(
                         user,
-                        cast(SQLAOAuthAccountT, existing_oauth_account),
+                        cast("SQLAOAuthAccountT", existing_oauth_account),
                         oauth_account_dict,
                     )
 

@@ -6,8 +6,8 @@ import re
 import subprocess
 import sys
 import timeit
-from collections.abc import Awaitable, Generator
-from typing import Any, Callable
+from collections.abc import Awaitable, Callable, Generator
+from typing import Any
 
 import asyncpg
 import pytest

@@ -8,7 +8,7 @@ from advanced_alchemy.extensions.litestar.plugins import SQLAlchemyInitPlugin
 from litestar.exceptions import ImproperlyConfiguredException
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
-from litestar_users.adapter.sqlalchemy.repository import SQLAlchemyRoleRepository
+from litestar_users.repository import SQLAlchemyRoleRepository
 
 if TYPE_CHECKING:
     from litestar import Litestar
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 def get_litestar_users_plugin(app: Litestar) -> LitestarUsersPlugin:
     """Get the LitestarUsersPlugin from the Litestar application."""
-    from litestar_users import LitestarUsersPlugin
+    from litestar_users import LitestarUsersPlugin  # noqa: PLC0415
 
     try:
         return app.plugins.get(LitestarUsersPlugin)

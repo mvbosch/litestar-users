@@ -60,7 +60,7 @@ def exception_to_http_response(request: Request, exception: RepositoryError | To
         http_exception = NotFoundException
     elif isinstance(exception, IntegrityError):
         http_exception = ConflictException
-    elif isinstance(exception, (InvalidTokenException, ExpiredTokenException)):
+    elif isinstance(exception, InvalidTokenException | ExpiredTokenException):
         http_exception = InvalidException
     else:
         http_exception = InternalServerException

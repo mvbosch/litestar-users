@@ -1,9 +1,9 @@
 [project]
 name = "litestar-users"
-version = "1.7.0"
+version = "2.0.0"
 description = "Authentication and user management for Litestar"
 authors = [{ name = "Michael Bosch", email = "michael@vonbosch.co.za" }]
-requires-python = "~=3.9"
+requires-python = ">=3.10"
 readme = "README.md"
 license = "MIT"
 dependencies = [
@@ -66,10 +66,8 @@ addopts = "--ignore=examples"
 asyncio_mode = "auto"
 
 [tool.pyright]
+pythonVersion = "3.10"
 include = ["litestar_users", "tests", "examples"]
-exclude = [
-    "litestar_users/adapter/sqlalchemy/mixins"
-]
 
 [tool.slotscheck]
 strict-imports = false
@@ -77,7 +75,7 @@ strict-imports = false
 [tool.ruff]
 line-length = 120
 src = ["litestar_users", "tests", "examples"]
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = [

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 from collections.abc import AsyncIterator, Generator, Iterator
 from dataclasses import dataclass
@@ -18,8 +16,7 @@ from litestar.datastructures import State
 from litestar.dto import DataclassDTO
 from litestar.middleware.session.server_side import ServerSideSessionConfig
 from litestar.repository.exceptions import RepositoryError
-from litestar.security.jwt import JWTAuth, JWTCookieAuth, Token
-from litestar.security.session_auth import SessionAuth
+from litestar.security.jwt import Token
 from litestar.testing import TestClient
 from sqlalchemy import Text
 from sqlalchemy.engine import URL
@@ -27,8 +24,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.pool import NullPool
 
-from litestar_users import LitestarUsersConfig, LitestarUsersPlugin
-from litestar_users.adapter.sqlalchemy.mixins import SQLAlchemyUserMixin
+from litestar_users import (
+    JWTAuthConfig,
+    JWTCookieAuthConfig,
+    LitestarUsersConfig,
+    LitestarUsersPlugin,
+)
 from litestar_users.config import (
     AuthHandlerConfig,
     CurrentUserHandlerConfig,
@@ -38,6 +39,7 @@ from litestar_users.config import (
     VerificationHandlerConfig,
 )
 from litestar_users.exceptions import TokenException, exception_to_http_response
+from litestar_users.mixins import SQLAlchemyUserMixin
 from litestar_users.password import PasswordManager
 from litestar_users.service import BaseUserService
 from tests.constants import ENCODING_SECRET, HASH_SCHEMES
@@ -172,7 +174,6 @@ def unverified_user_token(unverified_user: Any) -> str:
 def sqlalchemy_plugin_config(docker_ip: str) -> SQLAlchemyAsyncConfig:
     return SQLAlchemyAsyncConfig(
         connection_string=f"postgresql+asyncpg://postgres:super-secret@{docker_ip}:5423/postgres",
-        session_dependency_key="session",
         session_config=AsyncSessionConfig(expire_on_commit=False),
     )
 
@@ -184,17 +185,16 @@ def sqlalchemy_plugin(sqlalchemy_plugin_config: SQLAlchemyAsyncConfig) -> SQLAlc
 
 @pytest.fixture(
     params=[
-        pytest.param(SessionAuth, id="session"),
-        pytest.param(JWTAuth, id="jwt"),
-        pytest.param(JWTCookieAuth, id="jwt_cookie"),
+        pytest.param(ServerSideSessionConfig(), id="session"),
+        pytest.param(JWTAuthConfig(), id="jwt"),
+        pytest.param(JWTCookieAuthConfig(), id="jwt_cookie"),
     ],
 )
 def litestar_users_config(request: pytest.FixtureRequest, models: dict[str, Any]) -> LitestarUsersConfig:
     return LitestarUsersConfig(  # pyright: ignore
-        auth_backend_class=request.param,
+        auth_config=request.param,
         authentication_request_schema=models["CustomAuthenticationSchema"],
         user_auth_identifier="username",
-        session_backend_config=ServerSideSessionConfig(),
         secret=ENCODING_SECRET,
         user_model=models["User"],  # pyright: ignore
         user_registration_dto=models["UserRegistrationDTO"],

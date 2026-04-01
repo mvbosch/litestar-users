@@ -142,7 +142,7 @@ def assign_role(
         sys.exit(1)
 
     email = email or prompt("User email")
-    role = role or cast(str, prompt("Role", type=str))
+    role = role or cast("str", prompt("Role", type=str))
 
     async def _assign_role() -> None:
         async with async_session(app) as session:
@@ -155,7 +155,7 @@ def assign_role(
                 echo("User not found", err=True)
                 sys.exit(1)
             try:
-                role_db = await user_service.get_role_by_name(role)  # type: ignore[arg-type]
+                role_db = await user_service.get_role_by_name(role)
             except NotFoundError:
                 echo("Role not found", err=True)
                 sys.exit(1)
