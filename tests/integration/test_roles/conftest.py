@@ -23,6 +23,10 @@ from litestar_users.config import RoleManagementHandlerConfig
 from litestar_users.guards import roles_accepted, roles_required
 from litestar_users.service import BaseUserService
 from tests.conftest import password_manager
+from litestar_users.mixins import (
+    SQLAlchemyRoleMixin,
+    SQLAlchemyUserMixin,
+)
 from tests.constants import ENCODING_SECRET
 from tests.utils import MockAuth
 

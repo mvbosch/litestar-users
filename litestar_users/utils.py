@@ -8,7 +8,7 @@ from advanced_alchemy.extensions.litestar.plugins import SQLAlchemyInitPlugin
 from litestar.exceptions import ImproperlyConfiguredException
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
-from litestar_users.adapter.sqlalchemy.repository import SQLAlchemyRoleRepository
+from litestar_users.repository import SQLAlchemyRoleRepository
 
 if TYPE_CHECKING:
     from litestar import Litestar

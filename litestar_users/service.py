@@ -11,10 +11,10 @@ from litestar.security.jwt.token import Token
 from sqlalchemy import func
 
 import jwt
-from litestar_users.adapter.sqlalchemy.protocols import SQLAOAuthAccountT, SQLARoleT, SQLAUserT
 from litestar_users.exceptions import InvalidTokenException
 from litestar_users.jwt import decode_jwt, generate_jwt
 from litestar_users.password import PasswordManager
+from litestar_users.protocols import SQLAOAuthAccountT, SQLARoleT, SQLAUserT
 from litestar_users.schema import OAuth2AuthorizeSchema
 
 try:
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from litestar import Request
     from sqlalchemy.sql import ColumnElement
 
-    from litestar_users.adapter.sqlalchemy.repository import (
+    from litestar_users.repository import (
         SQLAlchemyOAuthAccountRepository,
         SQLAlchemyRoleRepository,
         SQLAlchemyUserRepository,
@@ -627,7 +627,7 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
                 if existing_oauth_account.account_id == account_id and existing_oauth_account.oauth_name == oauth_name:
                     user = await self.oauth2_repository.update_oauth_account(
                         user,
-                        cast(SQLAOAuthAccountT, existing_oauth_account),
+                        cast("SQLAOAuthAccountT", existing_oauth_account),
                         oauth_account_dict,
                     )
 

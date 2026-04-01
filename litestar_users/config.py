@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any, Generic
 from litestar.exceptions import ImproperlyConfiguredException
 from litestar.security.session_auth import SessionAuth
 
-from litestar_users.adapter.sqlalchemy.repository import SQLAlchemyUserRepository
-from litestar_users.protocols import OAuthAccountT, RoleT, UserT
+from litestar_users.protocols import SQLAOAuthAccountT, SQLARoleT, SQLAUserT
+from litestar_users.repository import SQLAlchemyUserRepository
 from litestar_users.schema import AuthenticationSchema
 
 try:

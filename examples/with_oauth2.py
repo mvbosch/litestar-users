@@ -16,7 +16,6 @@ from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from litestar_users import LitestarUsersConfig, LitestarUsersPlugin
-from litestar_users.adapter.sqlalchemy.mixins import SQLAlchemyOAuthAccountMixin, SQLAlchemyUserMixin
 from litestar_users.config import (
     AuthHandlerConfig,
     CurrentUserHandlerConfig,
@@ -28,6 +27,7 @@ from litestar_users.config import (
     VerificationHandlerConfig,
 )
 from litestar_users.guards import roles_accepted, roles_required
+from litestar_users.mixins import SQLAlchemyOAuthAccountMixin, SQLAlchemyUserMixin
 from litestar_users.password import PasswordManager
 from litestar_users.service import BaseUserService
 

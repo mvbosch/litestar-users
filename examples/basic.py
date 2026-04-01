@@ -17,7 +17,6 @@ from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from litestar_users import LitestarUsersConfig, LitestarUsersPlugin
-from litestar_users.adapter.sqlalchemy.mixins import SQLAlchemyUserMixin
 from litestar_users.config import (
     AuthHandlerConfig,
     CurrentUserHandlerConfig,
@@ -26,6 +25,7 @@ from litestar_users.config import (
     UserManagementHandlerConfig,
     VerificationHandlerConfig,
 )
+from litestar_users.mixins import SQLAlchemyUserMixin
 from litestar_users.password import PasswordManager
 from litestar_users.service import BaseUserService
 

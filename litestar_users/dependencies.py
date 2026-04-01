@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from advanced_alchemy.extensions.litestar.plugins import SQLAlchemyAsyncConfig
 from litestar.exceptions import ImproperlyConfiguredException
 
-from litestar_users.adapter.sqlalchemy.repository import (
+from litestar_users.repository import (
     SQLAlchemyOAuthAccountRepository,
     SQLAlchemyRoleRepository,
 )

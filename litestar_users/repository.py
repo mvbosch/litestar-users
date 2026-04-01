@@ -1,14 +1,10 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, Any, Generic
+from typing import Any, Generic
 
 from advanced_alchemy.repository import SQLAlchemyAsyncRepository
 from litestar.exceptions import ImproperlyConfiguredException
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from litestar_users.adapter.sqlalchemy.protocols import SQLAOAuthAccountT, SQLARoleT, SQLAUserT
-
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
+from litestar_users.protocols import SQLAOAuthAccountT, SQLARoleT, SQLAUserT
 
 __all__ = ["SQLAlchemyRoleRepository", "SQLAlchemyUserRepository"]
 
@@ -96,7 +92,7 @@ class SQLAlchemyRoleRepository(SQLAlchemyAsyncRepository[SQLARoleT], Generic[SQL
     """SQLAlchemy implementation of role persistence layer."""
 
     def __init__(self, session: AsyncSession, model_type: type[SQLARoleT], **kwargs: Any) -> None:
-        """Repository for users.
+        """Repository for roles.
 
         Args:
             session: Session managing the unit-of-work for the operation.

@@ -18,6 +18,7 @@ from litestar.security.session_auth.auth import SessionAuth
 from litestar_users.adapter.sqlalchemy.protocols import SQLARoleT, SQLAUserT
 from litestar_users.dependencies import provide_user_service
 from litestar_users.dtos import OAuthAuthorizeDTO
+from litestar_users.protocols import SQLARoleT, SQLAUserT
 from litestar_users.schema import OAuth2AuthorizeSchema
 
 try:

@@ -38,6 +38,7 @@ from litestar_users.config import (
     VerificationHandlerConfig,
 )
 from litestar_users.exceptions import TokenException, exception_to_http_response
+from litestar_users.mixins import SQLAlchemyUserMixin
 from litestar_users.password import PasswordManager
 from litestar_users.service import BaseUserService
 from tests.constants import ENCODING_SECRET, HASH_SCHEMES
