@@ -72,7 +72,8 @@ def models() -> Generator[dict[str, Any], None, None]:
     UUIDBase.metadata.clear()
 
     class User(UUIDBase, SQLAlchemyUserMixin):
-        username: Mapped[str] = mapped_column(Text(), unique=True)
+        username: Mapped[str] = mapped_column(Text())
+        company_id: Mapped[str | None] = mapped_column(Text(), nullable=True)
 
     @dataclass
     class UserRegistration:

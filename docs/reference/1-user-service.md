@@ -11,6 +11,7 @@
             - update_user
             - delete_user
             - authenticate
+            - get_additional_auth_filters
             - generate_token
             - initiate_verification
             - send_verification_token

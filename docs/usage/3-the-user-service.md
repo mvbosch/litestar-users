@@ -56,3 +56,35 @@ This could be used to send users a "welcoming email" describing the application 
 
 Executes custom asynchronous code *after* a user has successfully verified their account.
 An example use is updating external sources with active user metrics, etc.
+
+### [`get_additional_auth_filters`][litestar_users.service.BaseUserService.get_additional_auth_filters]
+
+Returns extra SQLAlchemy filter expressions that are applied when looking up a user during authentication.
+
+By default, authentication queries the database using only the configured `user_auth_identifier` (e.g. `email`). This is sufficient for most single-tenant applications where that identifier is unique across the entire table. In multitenant setups, however, the same identifier value may legitimately appear in multiple rows -- once per tenant. Because the user's id is not yet known at authentication time, there is no built-in way to narrow the lookup further.
+
+The `request` parameter gives you access to the full HTTP context, making it straightforward to derive discriminating values from headers, cookies, path parameters, and so on.
+
+!!!warning
+    Values provided by request bodies, query params or headers (as per this example) are controlled by the client and cannot be fully trusted. However, for the purposes of authentication, a malicious actor would still require the targeted account password.
+    Wherever possible though, you should only retrieve data from trusted sources such as server-signed cookies or tokens.
+
+```python
+from collections.abc import Sequence
+from typing import Any
+
+from litestar import Request
+from sqlalchemy.sql import ColumnElement
+
+from litestar_users.service import BaseUserService
+
+from local.models import User
+
+
+class UserService(BaseUserService[User, Any, Any]):
+    def get_additional_auth_filters(
+        self, data: Any, request: Request | None = None
+    ) -> Sequence[ColumnElement[bool]]:
+        company_id = request.headers.get("x-company-id", "") if request else ""
+        return [User.company_id == company_id]
+```
