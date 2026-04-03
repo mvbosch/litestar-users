@@ -27,6 +27,7 @@ from litestar_users.exceptions import TokenException, exception_to_http_response
 from litestar_users.password import PasswordManager
 from litestar_users.service import BaseUserService
 from tests.constants import ENCODING_SECRET, HASH_SCHEMES
+from tests.integration.conftest import TestModels
 
 password_manager = PasswordManager(hash_schemes=HASH_SCHEMES)
 
@@ -40,7 +41,7 @@ class MultitenantUserService(BaseUserService[Any, Any, Any]):
 
 
 @pytest.fixture()
-def user_company_a(models: dict[str, Any]) -> Any:
+def user_company_a(models: TestModels) -> Any:
     return models["User"](
         id=UUID("d4f85862-79ac-4531-be10-85f6c65c5d79"),
         username="shared_user",
@@ -53,7 +54,7 @@ def user_company_a(models: dict[str, Any]) -> Any:
 
 
 @pytest.fixture()
-def user_company_b(models: dict[str, Any]) -> Any:
+def user_company_b(models: TestModels) -> Any:
     return models["User"](
         id=UUID("80a58d13-9d17-48d4-9ae3-27d799eb03c9"),
         username="shared_user",
@@ -79,7 +80,7 @@ async def _seed_multitenant_users(
 
 
 @pytest.fixture()
-def multitenant_litestar_users_config(models: dict[str, Any]) -> LitestarUsersConfig:
+def multitenant_litestar_users_config(models: TestModels) -> LitestarUsersConfig:
     return LitestarUsersConfig(  # pyright: ignore
         auth_config=JWTAuthConfig(),
         authentication_request_schema=models["CustomAuthenticationSchema"],

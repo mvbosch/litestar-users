@@ -1,6 +1,6 @@
 from collections.abc import AsyncIterator, Generator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict
 from uuid import UUID
 
 import pytest
@@ -28,8 +28,21 @@ if TYPE_CHECKING:
     from litestar.testing import TestClient
 
 
+class TestRoleModels(TypedDict):
+    Role: type[UUIDBase]
+    User: type[UUIDBase]
+    UserRole: type[UUIDBase]
+    RoleReadDTO: type[SQLAlchemyDTO[Any]]
+    RoleCreateDTO: type[SQLAlchemyDTO[Any]]
+    RoleUpdateDTO: type[SQLAlchemyDTO[Any]]
+    UserRegistrationSchema: type[Any]
+    UserRegistrationDTO: type[DataclassDTO[Any]]
+    UserReadDTO: type[SQLAlchemyDTO[Any]]
+    UserUpdateDTO: type[SQLAlchemyDTO[Any]]
+
+
 @pytest.fixture(scope="session")
-def models() -> Generator[dict[str, Any], None, None]:
+def models() -> Generator[TestRoleModels, None, None]:
     UUIDBase.metadata.clear()
 
     class Role(UUIDBase, SQLAlchemyRoleMixin):
@@ -77,7 +90,7 @@ def models() -> Generator[dict[str, Any], None, None]:
 
         config = SQLAlchemyDTOConfig(exclude={"id", "password", "password_hash", "roles"}, partial=True)
 
-    _models = {
+    _models: TestRoleModels = {
         "Role": Role,
         "User": User,
         "UserRole": UserRole,
@@ -98,7 +111,7 @@ class UserService(BaseUserService[Any, Any, Any]):
 
 
 @pytest.fixture()
-def admin_role(models: dict[str, Any]) -> Any:
+def admin_role(models: TestRoleModels) -> Any:
     return models["Role"](
         id=UUID("9b62b52c-4278-4124-aca8-783ab281c196"),
         name="administrator",
@@ -107,7 +120,7 @@ def admin_role(models: dict[str, Any]) -> Any:
 
 
 @pytest.fixture()
-def writer_role(models: dict[str, Any]) -> Any:
+def writer_role(models: TestRoleModels) -> Any:
     return models["Role"](
         id=UUID("76ddde3c-91d0-4b58-baa4-bfc4b3892ab2"),
         name="writer",
@@ -116,7 +129,7 @@ def writer_role(models: dict[str, Any]) -> Any:
 
 
 @pytest.fixture()
-def admin_user(admin_role: Any, models: dict[str, Any]) -> Any:
+def admin_user(admin_role: Any, models: TestRoleModels) -> Any:
     return models["User"](
         id=UUID("01676112-d644-4f93-ab32-562850e89549"),
         email="admin@example.com",
@@ -129,7 +142,7 @@ def admin_user(admin_role: Any, models: dict[str, Any]) -> Any:
 
 
 @pytest.fixture()
-def generic_user(models: dict[str, Any]) -> Any:
+def generic_user(models: TestRoleModels) -> Any:
     return models["User"](
         id=UUID("555d9ddb-7033-4819-a983-e817237b88e5"),
         email="good@example.com",
@@ -148,7 +161,7 @@ def generic_user(models: dict[str, Any]) -> Any:
         pytest.param(JWTCookieAuthConfig(), id="jwt_cookie"),
     ],
 )
-def litestar_users_config(request: pytest.FixtureRequest, models: dict[str, Any]) -> LitestarUsersConfig:
+def litestar_users_config(request: pytest.FixtureRequest, models: TestRoleModels) -> LitestarUsersConfig:
     return LitestarUsersConfig(  # pyright: ignore
         auth_config=request.param,
         secret=ENCODING_SECRET,
@@ -192,7 +205,7 @@ async def _seed_db(
     generic_user: Any,
     admin_role: Any,
     writer_role: Any,
-    models: dict[str, Any],
+    models: TestRoleModels,
 ) -> "AsyncIterator[None]":
     """Populate test database with.
 
