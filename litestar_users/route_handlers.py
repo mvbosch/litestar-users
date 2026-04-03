@@ -481,7 +481,7 @@ def get_current_user_handler(
     ) -> SQLAUserT:
         """Update the current user."""
         data.id = request.user.id  # pyright: ignore[reportAttributeAccessIssue]
-        return cast("SQLAUserT", await service.update_user(data=data))
+        return cast("SQLAUserT", await service.update_user(user=data))
 
     return Router(path="/", route_handlers=[get_current_user, update_current_user])
 
@@ -643,7 +643,7 @@ def get_role_management_handler(
     async def update_role(role_id: UUID | int, data: SQLARoleT, service: UserServiceType) -> SQLARoleT:
         """Update a role in the database."""
         data.id = role_id  # type: ignore[assignment]
-        return cast("SQLARoleT", await service.update_role(role_id, data))
+        return cast("SQLARoleT", await service.update_role(data))
 
     @delete(
         path=identifier_uri,

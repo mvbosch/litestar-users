@@ -180,17 +180,25 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
             *filters, order_by=order_by, load=load, execution_options=execution_options
         )
 
-    async def update_user(self, data: SQLAUserT) -> SQLAUserT:
-        """Update arbitrary user attributes in the database.
+    async def update_user(self, user: SQLAUserT) -> SQLAUserT:
+        """Update a user's attributes in the database.
+
+        The ``user`` instance may be partial and will be forwarded to
+        [SQLAlchemyAsyncRepository.update][advanced_alchemy.repository.SQLAlchemyAsyncRepository.update],
+        which ensures that only explicitly set fields are merged into the existing
+        database record. The caller is responsible for setting ``user.id`` before
+        invoking this method so the repository can identify which record to update.
 
         Args:
-            data: User update data transfer object.
+            user: A ``User`` model instance. Must have ``id`` set. If
+                ``password_hash`` is set it is treated as a plain-text password
+                and will be hashed before being stored.
         """
-        # password is not hashed yet, despite attribute name.
-        if data.password_hash:
-            data.password_hash = self.password_manager.hash(str(data.password_hash))  # type: ignore[assignment]
+        # password_hash carries a plain-text password at this point despite the name.
+        if user.password_hash:
+            user.password_hash = self.password_manager.hash(str(user.password_hash))  # type: ignore[assignment]
 
-        return await self.user_repository.update(data)
+        return await self.user_repository.update(user)
 
     async def delete_user(self, user_id: UUID | int) -> SQLAUserT:
         """Delete a user from the database.
@@ -476,15 +484,15 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
 
         return token
 
-    async def get_role(self, id_: UUID | int) -> SQLARoleT:
+    async def get_role(self, role_id: UUID | int) -> SQLARoleT:
         """Retrieve a role by id.
 
         Args:
-            id_: ID of the role.
+            role_id: ID of the role.
         """
         if self.role_repository is None:
             raise ImproperlyConfiguredException("roles have not been configured")
-        return await self.role_repository.get(id_)
+        return await self.role_repository.get(role_id)
 
     async def list_and_count_roles(
         self,
@@ -527,26 +535,25 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
             raise ImproperlyConfiguredException("roles have not been configured")
         return await self.role_repository.add(data)
 
-    async def update_role(self, id_: UUID | int, data: SQLARoleT) -> SQLARoleT:
+    async def update_role(self, data: SQLARoleT) -> SQLARoleT:
         """Update a role in the database.
 
         Args:
-            id_: UUID corresponding to the role primary key.
             data: A role update data transfer object.
         """
         if self.role_repository is None:
             raise ImproperlyConfiguredException("roles have not been configured")
         return await self.role_repository.update(data)
 
-    async def delete_role(self, id_: UUID | int) -> SQLARoleT:
+    async def delete_role(self, role_id: UUID | int) -> SQLARoleT:
         """Delete a role from the database.
 
         Args:
-            id_: UUID corresponding to the role primary key.
+            role_id: UUID corresponding to the role primary key.
         """
         if self.role_repository is None:
             raise ImproperlyConfiguredException("roles have not been configured")
-        return await self.role_repository.delete(id_)
+        return await self.role_repository.delete(role_id)
 
     async def assign_role(self, user_id: UUID | int, role_id: UUID | int) -> SQLAUserT:
         """Add a role to a user.
