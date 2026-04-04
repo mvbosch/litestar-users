@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator, Generator, Iterator
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict
 from uuid import UUID
 
 import pytest
@@ -52,6 +52,15 @@ password_manager = PasswordManager(hash_schemes=HASH_SCHEMES)
 here = Path(__file__).parent
 
 
+class TestModels(TypedDict):
+    User: type[UUIDBase]
+    UserRegistration: type[Any]
+    CustomAuthenticationSchema: type[Any]
+    UserRegistrationDTO: type[DataclassDTO[Any]]
+    UserReadDTO: type[SQLAlchemyDTO[Any]]
+    UserUpdateDTO: type[SQLAlchemyDTO[Any]]
+
+
 @pytest.fixture(scope="session")
 def event_loop() -> "abc.Iterator[asyncio.AbstractEventLoop]":
     """Scoped Event loop.
@@ -68,7 +77,7 @@ def event_loop() -> "abc.Iterator[asyncio.AbstractEventLoop]":
 
 
 @pytest.fixture(scope="session")
-def models() -> Generator[dict[str, Any], None, None]:
+def models() -> Generator[TestModels, None, None]:
     UUIDBase.metadata.clear()
 
     class User(UUIDBase, SQLAlchemyUserMixin):
@@ -98,7 +107,7 @@ def models() -> Generator[dict[str, Any], None, None]:
 
         config = SQLAlchemyDTOConfig(exclude={"id", "email"}, rename_fields={"password_hash": "password"}, partial=True)
 
-    _models = {
+    _models: TestModels = {
         "User": User,
         "UserRegistration": UserRegistration,
         "CustomAuthenticationSchema": CustomAuthenticationSchema,
@@ -115,7 +124,7 @@ class UserService(BaseUserService[Any, Any, Any]):
 
 
 @pytest.fixture()
-def admin_user(models: dict[str, Any]) -> Any:
+def admin_user(models: TestModels) -> Any:
     return models["User"](
         id=UUID("01676112-d644-4f93-ab32-562850e89549"),
         username="the_admin",
@@ -127,7 +136,7 @@ def admin_user(models: dict[str, Any]) -> Any:
 
 
 @pytest.fixture()
-def generic_user(models: dict[str, Any]) -> Any:
+def generic_user(models: TestModels) -> Any:
     return models["User"](
         id=UUID("555d9ddb-7033-4819-a983-e817237b88e5"),
         email="good@example.com",
@@ -149,7 +158,7 @@ def generic_user_password_reset_token(generic_user: Any) -> str:
 
 
 @pytest.fixture()
-def unverified_user(models: dict[str, Any]) -> Any:
+def unverified_user(models: TestModels) -> Any:
     return models["User"](
         id=UUID("68dec058-b752-42eb-8e55-b94a7b275f99"),
         email="unverified@example.com",
@@ -190,7 +199,7 @@ def sqlalchemy_plugin(sqlalchemy_plugin_config: SQLAlchemyAsyncConfig) -> SQLAlc
         pytest.param(JWTCookieAuthConfig(), id="jwt_cookie"),
     ],
 )
-def litestar_users_config(request: pytest.FixtureRequest, models: dict[str, Any]) -> LitestarUsersConfig:
+def litestar_users_config(request: pytest.FixtureRequest, models: TestModels) -> LitestarUsersConfig:
     return LitestarUsersConfig(  # pyright: ignore
         auth_config=request.param,
         authentication_request_schema=models["CustomAuthenticationSchema"],
@@ -305,7 +314,7 @@ async def _seed_db(
     admin_user: Any,
     generic_user: Any,
     unverified_user: Any,
-    models: dict[str, Any],
+    models: TestModels,
 ) -> "AsyncIterator[None]":
     """Populate test database with.
 

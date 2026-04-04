@@ -9,11 +9,16 @@
 - **breaking**: remove `_update` from `SQLAlchemyUserRepository`; password rehash on login now uses `user_repository.update()` directly.
 - **breaking**: mixins are now importable from `litestar_users.mixins` (previously only `litestar_users.adapter.sqlalchemy.mixins`).
 - **breaking**: role guards now raise the correct HTTP 403 status exception instead of the incorrect 401.
+- **breaking** rename `id_` parameter to `user_id` on `BaseUserService.get_user` and `delete_user` for consistency.
+- **breaking**: rename `data` parameter to `user` on `BaseUserService.update_user`.
+- **breaking**: rename `id_` parameter to `role_id` on `BaseUserService.get_role` and `delete_role`.
+- **breaking**: remove the `id_` positional parameter from `BaseUserService.update_role`; callers must set `data.id` before invoking.
 - add `AnonymousUser` and `no_validation` for opt-in anonymous access on individual route handlers.
 - add `OAuth2HandlerConfig` to `__all__` in `litestar_users.config`.
 - fix repository `add_oauth_account` and `update_oauth_account` to use `self.add()`/`self.update()` for consistent `auto_commit` behaviour.
 - add example tests covering registration, login, duplicate rejection, and route registration for all three example applications.
 - update documentation to reflect all API changes.
+- add `BaseUserService.get_additional_auth_filters` method.
 
 [v1.7.0]
 

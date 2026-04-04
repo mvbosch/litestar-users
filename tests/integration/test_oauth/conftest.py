@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import AsyncIterator, Callable, Generator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict
 from unittest.mock import MagicMock
 from uuid import UUID
 
@@ -36,8 +36,17 @@ if TYPE_CHECKING:
     from litestar.testing import TestClient
 
 
+class TestOAuthModels(TypedDict):
+    OAuthAccount: type[UUIDBase]
+    User: type[UUIDBase]
+    UserRegistrationSchema: type[Any]
+    UserRegistrationDTO: type[DataclassDTO[Any]]
+    UserReadDTO: type[SQLAlchemyDTO[Any]]
+    UserUpdateDTO: type[SQLAlchemyDTO[Any]]
+
+
 @pytest.fixture(scope="session")
-def models() -> Generator[dict[str, Any], None, None]:
+def models() -> Generator[TestOAuthModels, None, None]:
     UUIDBase.metadata.clear()
 
     class OAuthAccount(UUIDBase, SQLAlchemyOAuthAccountMixin):
@@ -68,7 +77,7 @@ def models() -> Generator[dict[str, Any], None, None]:
 
         config = SQLAlchemyDTOConfig(exclude={"id", "password", "password_hash", "oauth_accounts"}, partial=True)
 
-    _models = {
+    _models: TestOAuthModels = {
         "OAuthAccount": OAuthAccount,
         "User": User,
         "UserRegistrationSchema": UserRegistrationSchema,
@@ -90,7 +99,7 @@ def user_service() -> type[UserService]:
 
 
 @pytest.fixture()
-def generic_user(models: dict[str, Any]) -> Any:
+def generic_user(models: TestOAuthModels) -> Any:
     return models["User"](
         id=UUID("3294ab42-3ef0-4bd8-844d-842ba421e46e"),
         email="test1@example.com",
@@ -102,7 +111,7 @@ def generic_user(models: dict[str, Any]) -> Any:
 
 
 @pytest.fixture()
-def inactive_user(models: dict[str, Any]) -> Any:
+def inactive_user(models: TestOAuthModels) -> Any:
     return models["User"](
         id=UUID("fc7ed851-d7c6-412d-9f79-4780b80e4fb0"),
         email="test2@example.com",
@@ -113,7 +122,7 @@ def inactive_user(models: dict[str, Any]) -> Any:
 
 
 @pytest.fixture()
-def verified_user(models: dict[str, Any]) -> Any:
+def verified_user(models: TestOAuthModels) -> Any:
     return models["User"](
         id=UUID("c382c9ec-e7be-43cd-80cc-f421e5308d76"),
         email="test3@example.com",
@@ -125,7 +134,7 @@ def verified_user(models: dict[str, Any]) -> Any:
 
 
 @pytest.fixture
-def oauth_account1(generic_user: Any, models: dict[str, Any]) -> Any:
+def oauth_account1(generic_user: Any, models: TestOAuthModels) -> Any:
     return models["OAuthAccount"](
         user_id=generic_user.id,
         oauth_name="service1",
@@ -137,7 +146,7 @@ def oauth_account1(generic_user: Any, models: dict[str, Any]) -> Any:
 
 
 @pytest.fixture
-def oauth_account2(generic_user: Any, models: dict[str, Any]) -> Any:
+def oauth_account2(generic_user: Any, models: TestOAuthModels) -> Any:
     return models["OAuthAccount"](
         user_id=generic_user.id,
         oauth_name="service2",
@@ -149,7 +158,7 @@ def oauth_account2(generic_user: Any, models: dict[str, Any]) -> Any:
 
 
 @pytest.fixture
-def oauth_account3(inactive_user: Any, models: dict[str, Any]) -> Any:
+def oauth_account3(inactive_user: Any, models: TestOAuthModels) -> Any:
     return models["OAuthAccount"](
         user_id=inactive_user.id,
         oauth_name="service1",
@@ -161,7 +170,7 @@ def oauth_account3(inactive_user: Any, models: dict[str, Any]) -> Any:
 
 
 @pytest.fixture
-def oauth_account4(verified_user: Any, models: dict[str, Any]) -> Any:
+def oauth_account4(verified_user: Any, models: TestOAuthModels) -> Any:
     return models["OAuthAccount"](
         user_id=verified_user.id,
         oauth_name="service1",
@@ -196,7 +205,7 @@ def oauth_client() -> OAuth2:
     ],
 )
 def litestar_users_config(
-    request: pytest.FixtureRequest, oauth_client: OAuth2, user_service: UserService, models: dict[str, Any]
+    request: pytest.FixtureRequest, oauth_client: OAuth2, user_service: UserService, models: TestOAuthModels
 ) -> LitestarUsersConfig:
     return LitestarUsersConfig(  # pyright: ignore
         auth_config=request.param,
@@ -274,7 +283,7 @@ async def _seed_db(
     oauth_account2: Any,
     oauth_account3: Any,
     oauth_account4: Any,
-    models: dict[str, Any],
+    models: TestOAuthModels,
 ) -> "AsyncIterator[None]":
     """Populate test database with.
 

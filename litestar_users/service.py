@@ -132,16 +132,16 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
         return user
 
     async def get_user(
-        self, id_: UUID | int, load: LoadSpec | None = None, execution_options: dict[str, Any] | None = None
+        self, user_id: UUID | int, load: LoadSpec | None = None, execution_options: dict[str, Any] | None = None
     ) -> SQLAUserT:
         """Retrieve a user from the database by id.
 
         Args:
-            id_: UUID corresponding to a user primary key.
+            user_id: UUID corresponding to a user primary key.
             load: Set relationships to be loaded
             execution_options: Set default execution options
         """
-        return await self.user_repository.get(id_, load=load, execution_options=execution_options)
+        return await self.user_repository.get(user_id, load=load, execution_options=execution_options)
 
     async def get_user_by(
         self, load: LoadSpec | None = None, execution_options: dict[str, Any] | None = None, **kwargs: Any
@@ -180,25 +180,66 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
             *filters, order_by=order_by, load=load, execution_options=execution_options
         )
 
-    async def update_user(self, data: SQLAUserT) -> SQLAUserT:
-        """Update arbitrary user attributes in the database.
+    async def update_user(self, user: SQLAUserT) -> SQLAUserT:
+        """Update a user's attributes in the database.
+
+        The ``user`` instance may be partial and will be forwarded to
+        [SQLAlchemyAsyncRepository.update][advanced_alchemy.repository.SQLAlchemyAsyncRepository.update],
+        which ensures that only explicitly set fields are merged into the existing
+        database record. The caller is responsible for setting ``user.id`` before
+        invoking this method so the repository can identify which record to update.
 
         Args:
-            data: User update data transfer object.
+            user: A ``User`` model instance. Must have ``id`` set. If
+                ``password_hash`` is set it is treated as a plain-text password
+                and will be hashed before being stored.
         """
-        # password is not hashed yet, despite attribute name.
-        if data.password_hash:
-            data.password_hash = self.password_manager.hash(str(data.password_hash))  # type: ignore[assignment]
+        # password_hash carries a plain-text password at this point despite the name.
+        if user.password_hash:
+            user.password_hash = self.password_manager.hash(str(user.password_hash))  # type: ignore[assignment]
 
-        return await self.user_repository.update(data)
+        return await self.user_repository.update(user)
 
-    async def delete_user(self, id_: UUID | int) -> SQLAUserT:
+    async def delete_user(self, user_id: UUID | int) -> SQLAUserT:
         """Delete a user from the database.
 
         Args:
-            id_: UUID corresponding to a user primary key.
+            user_id: UUID corresponding to a user primary key.
         """
-        return await self.user_repository.delete(id_)
+        return await self.user_repository.delete(user_id)
+
+    def get_additional_auth_filters(self, data: Any, request: Request | None = None) -> Sequence[ColumnElement[bool]]:
+        """Get additional filters to apply to the authentication query.
+
+        By default, authentication looks up a user solely by the configured `user_auth_identifier`
+        (e.g. ``email``). In certain scenarios - such as multitenant applications - the database may
+        legitimately contain multiple rows sharing the same identifier value, one per tenant. Because
+        authentication has no way to narrow the lookup by user id (the id is not yet known at that
+        point), this method exists as the extension point for supplying the extra predicates needed.
+
+        The ``request`` parameter makes it straightforward to derive filter values from the incoming
+        HTTP context. For example, to scope authentication to the tenant identified by a custom
+        request header::
+
+            def get_additional_auth_filters(
+                self, data: Any, request: Request | None = None
+            ) -> Sequence[ColumnElement[bool]]:
+                company_id = request.headers.get("x-company-id", "") if request else ""
+                return [User.company_id == company_id]
+
+        Args:
+            data: User authentication data transfer object.
+            request: The litestar request that initiated the action.
+
+        Returns:
+            A list of SQLAlchemy filter expressions to apply to the authentication query.
+
+        Notes:
+        - Override this method in a subclass of `BaseUserService` to supply additional SQLAlchemy
+          filter expressions that will be applied when looking up a user during authentication.
+        - By default, no additional filters are applied.
+        """
+        return []
 
     async def authenticate(self, data: Any, request: Request | None = None) -> SQLAUserT | None:
         """Authenticate a user.
@@ -209,6 +250,7 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
         """
 
         load: LoadSpec | None = request.route_handler.opt.get("user_load_options") if request else None
+        additional_filters: Sequence[ColumnElement[bool]] = self.get_additional_auth_filters(data, request)
 
         # avoid early returns to mitigate timing attacks.
         # check if user supplied logic should allow authentication, but only
@@ -219,6 +261,7 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
             user = await self.user_repository.get_one(
                 func.lower(getattr(self.user_model, self.user_auth_identifier))
                 == getattr(data, self.user_auth_identifier).lower(),
+                *additional_filters,
                 load=load,
             )
         except NotFoundError:
@@ -441,15 +484,15 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
 
         return token
 
-    async def get_role(self, id_: UUID | int) -> SQLARoleT:
+    async def get_role(self, role_id: UUID | int) -> SQLARoleT:
         """Retrieve a role by id.
 
         Args:
-            id_: ID of the role.
+            role_id: ID of the role.
         """
         if self.role_repository is None:
             raise ImproperlyConfiguredException("roles have not been configured")
-        return await self.role_repository.get(id_)
+        return await self.role_repository.get(role_id)
 
     async def list_and_count_roles(
         self,
@@ -492,26 +535,25 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
             raise ImproperlyConfiguredException("roles have not been configured")
         return await self.role_repository.add(data)
 
-    async def update_role(self, id_: UUID | int, data: SQLARoleT) -> SQLARoleT:
+    async def update_role(self, data: SQLARoleT) -> SQLARoleT:
         """Update a role in the database.
 
         Args:
-            id_: UUID corresponding to the role primary key.
             data: A role update data transfer object.
         """
         if self.role_repository is None:
             raise ImproperlyConfiguredException("roles have not been configured")
         return await self.role_repository.update(data)
 
-    async def delete_role(self, id_: UUID | int) -> SQLARoleT:
+    async def delete_role(self, role_id: UUID | int) -> SQLARoleT:
         """Delete a role from the database.
 
         Args:
-            id_: UUID corresponding to the role primary key.
+            role_id: UUID corresponding to the role primary key.
         """
         if self.role_repository is None:
             raise ImproperlyConfiguredException("roles have not been configured")
-        return await self.role_repository.delete(id_)
+        return await self.role_repository.delete(role_id)
 
     async def assign_role(self, user_id: UUID | int, role_id: UUID | int) -> SQLAUserT:
         """Add a role to a user.

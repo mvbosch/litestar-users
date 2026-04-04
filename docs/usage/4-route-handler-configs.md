@@ -88,3 +88,31 @@ Provides the following route handlers:
 
 * `authorize`: Redirects the user to the OAuth2 provider's authorization page.
 * `callback`: Handles the OAuth2 provider's callback.
+
+## Eager-loading relationships via `user_load_options`
+
+Certain route handlers registered by litestar-users respect an `opt` key called `user_load_options`. When present, its value is passed directly as the `load` argument to the underlying repository query, allowing you to eagerly load SQLAlchemy relationships for that specific handler.
+
+This is useful whenever your response DTO or schema requires related objects to be present - for example, including role information on the login response, or loading a user's orders after OAuth2 sign-in.
+
+`user_load_options` is honoured in three places:
+
+* **`BaseUserService.authenticate`** - runs the relationship load when resolving the user during login, so the returned user already has the requested relations populated.
+* **`BaseUserService.get_by_oauth_account`** - runs the relationship load during the OAuth2 callback flow.
+* **JWT / session authentication middleware** - runs the relationship load when hydrating the request's authenticated user on every subsequent request.
+
+```python
+from litestar_users.config import AuthHandlerConfig
+from sqlalchemy.orm import selectinload
+
+from local.models import User
+
+# Eager-load `User.orders` on the login response,
+# e.g. to satisfy a response DTO that includes an `orders` field.
+auth_handler_config = AuthHandlerConfig(
+    opt={"user_load_options": [selectinload(User.orders)]},
+)
+```
+
+!!!note
+    The value must be a sequence of [`sqlalchemy.orm.Load`](https://docs.sqlalchemy.org/en/20/orm/queryguide/api.html#sqlalchemy.orm.Load) instances (e.g. `selectinload`, `joinedload`, `subqueryload`). Passing any other type raises a `ValueError` at authentication time.
