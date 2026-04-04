@@ -107,7 +107,6 @@ from sqlalchemy.orm import selectinload
 
 from local.models import User
 
-
 # Eager-load `User.orders` on the login response,
 # e.g. to satisfy a response DTO that includes an `orders` field.
 auth_handler_config = AuthHandlerConfig(
