@@ -124,3 +124,31 @@ class User(UUIDBase, SQLAlchemyUserMixin):
         OAuthAccount, lazy="selectin"
     )
 ```
+
+## Repositories
+
+Litestar-Users no longer ships its own repository classes. Instead, you subclass `SQLAlchemyAsyncRepository` from [advanced-alchemy](https://github.com/litestar-org/advanced-alchemy) and set `model_type` as a class variable. The plugin will instantiate the repository on every request.
+
+```python
+from advanced_alchemy.repository import SQLAlchemyAsyncRepository
+
+from .models import OAuthAccount, Role, User
+
+
+class UserRepository(SQLAlchemyAsyncRepository[User]):
+    model_type = User
+
+
+class RoleRepository(SQLAlchemyAsyncRepository[Role]):
+    model_type = Role
+
+
+class OAuthAccountRepository(SQLAlchemyAsyncRepository[OAuthAccount]):
+    model_type = OAuthAccount
+```
+
+Pass these classes to `LitestarUsersConfig`:
+
+* `user_repository_class` - required for all setups.
+* `oauth_account_repository_class` - required when using OAuth2.
+* `role_repository_class` - passed inside `RoleManagementHandlerConfig` when using RBAC.

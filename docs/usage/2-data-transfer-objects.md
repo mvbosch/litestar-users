@@ -10,7 +10,7 @@ A few constraints are enforced by `LitestarUsersConfig` at startup:
 - `LitestarUsersConfig` automatically injects `rename_fields = {"password_hash": "password"}` into the update DTO, so that clients send `password` (not `password_hash`) when changing a user's password. Exclude `password_hash` from the update DTO only if you intentionally want to disable password changes via that endpoint.
 
 !!! note
-    Excluding `password_hash` from the **read** DTO is a security best practice — hashed passwords should never be returned to the client. This is not validated automatically.
+    Excluding `password_hash` from the **read** DTO is a security best practice - hashed passwords should never be returned to the client. This is not validated automatically.
 
 ## Example
 

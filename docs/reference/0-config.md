@@ -8,12 +8,11 @@
             - auto_commit_transactions
             - secret
             - hash_schemes
-            - user_model
+            - user_repository_class
             - user_registration_dto
             - user_read_dto
             - user_update_dto
-            - oauth_account_model
-            - role_model
+            - oauth_account_repository_class
             - user_auth_identifier
             - user_service_class
             - require_verification_on_registration

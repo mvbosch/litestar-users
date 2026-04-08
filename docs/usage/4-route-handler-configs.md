@@ -40,14 +40,21 @@ Provides the following route handlers:
 * `assign_role`: Assign an existing role to an existing user.
 * `revoke_role`: Revoke an existing role from an existing user.
 
-`RoleManagementHandlerConfig` requires three positional DTO arguments:
+`RoleManagementHandlerConfig` requires a repository class and three DTO arguments:
 
 ```python
+from advanced_alchemy.repository import SQLAlchemyAsyncRepository
 from litestar_users.config import RoleManagementHandlerConfig
 from litestar_users.guards import roles_accepted
 
+from local.models import Role
 
-# Stub definitions — see Data transfer objects -> Role DTOs for the full implementation
+
+class RoleRepository(SQLAlchemyAsyncRepository[Role]):
+    model_type = Role
+
+
+# Stub definitions - see Data transfer objects -> Role DTOs for the full implementation
 class RoleCreateDTO: ...  # noqa: E701
 
 
@@ -58,6 +65,7 @@ class RoleUpdateDTO: ...  # noqa: E701
 
 
 role_management_handler_config = RoleManagementHandlerConfig(
+    role_repository_class=RoleRepository,
     role_create_dto=RoleCreateDTO,
     role_read_dto=RoleReadDTO,
     role_update_dto=RoleUpdateDTO,
