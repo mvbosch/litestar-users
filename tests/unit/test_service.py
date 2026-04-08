@@ -52,7 +52,7 @@ def _make_service(
         user_repo.delete = AsyncMock(return_value=MagicMock())
         user_repo.get_one_or_none = AsyncMock(return_value=None)
 
-    service = BaseUserService(
+    service: BaseUserService[Any, Any, Any] = BaseUserService(
         secret=SECRET,
         user_auth_identifier="email",
         user_repository=user_repo,
@@ -561,9 +561,10 @@ async def test_send_password_reset_token_returns_none() -> None:
 
 def _make_oauth2_repo(oauth_account: Any = None) -> AsyncMock:
     repo = AsyncMock()
+    repo.model_type = MagicMock()
     repo.get_one = AsyncMock(return_value=oauth_account)
-    repo.add_oauth_account = AsyncMock(side_effect=lambda user, data: user)
-    repo.update_oauth_account = AsyncMock(side_effect=lambda user, acc, data: user)
+    repo.add = AsyncMock(return_value=MagicMock())
+    repo.update = AsyncMock(return_value=MagicMock())
     return repo
 
 
@@ -645,7 +646,7 @@ async def test_oauth2_callback_internal_updates_existing_oauth_account() -> None
         oauth_account_dict={"access_token": "NEW_TOKEN"},
     )
 
-    oauth_repo.update_oauth_account.assert_called_once()
+    oauth_repo.update.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -672,7 +673,7 @@ async def test_oauth2_callback_internal_associates_existing_user_by_email() -> N
         oauth_account_dict={"access_token": "TOKEN"},
     )
 
-    oauth_repo.add_oauth_account.assert_called_once()
+    oauth_repo.add.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -699,7 +700,7 @@ async def test_oauth2_callback_internal_creates_new_user_when_associate_by_email
     )
 
     user_repo.add.assert_called_once()
-    oauth_repo.add_oauth_account.assert_called_once()
+    oauth_repo.add.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -791,7 +792,7 @@ async def test_oauth2_associate_callback_success() -> None:
         oauth_account_dict={"access_token": "TOKEN"},
     )
 
-    oauth_repo.add_oauth_account.assert_called_once_with(associate_user, {"access_token": "TOKEN"})
+    oauth_repo.add.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -929,7 +930,7 @@ async def test_oauth2_callback_outer_associate_path() -> None:
         associate_user=user,
     )
 
-    oauth_repo.add_oauth_account.assert_called_once()
+    oauth_repo.add.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -996,5 +997,5 @@ async def test_oauth2_callback_outer_regular_path() -> None:
         request=request,
     )
 
-    # update_oauth_account called because existing account matched
-    oauth_repo.update_oauth_account.assert_called_once()
+    # update called because existing account matched
+    oauth_repo.update.assert_called_once()

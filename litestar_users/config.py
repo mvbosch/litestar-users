@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING, Any, Generic, Literal
 
 from litestar.exceptions import ImproperlyConfiguredException
 
-from litestar_users.protocols import SQLAOAuthAccountT, SQLARoleT, SQLAUserT
-from litestar_users.repository import SQLAlchemyUserRepository
+from litestar_users.protocols import SQLAOAuthAccountT, SQLAUserT
 from litestar_users.schema import AuthenticationSchema
 
 if TYPE_CHECKING:
     from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO
+    from advanced_alchemy.repository import SQLAlchemyAsyncRepository
     from litestar.dto import DataclassDTO, MsgspecDTO
     from litestar.middleware.session.base import BaseBackendConfig
     from litestar.types import Guard
@@ -195,6 +195,8 @@ class RoleManagementHandlerConfig:
     Passing an instance to `LitestarUsersConfig` will automatically take care of handler registration on the app.
     """
 
+    role_repository_class: type[SQLAlchemyAsyncRepository]
+    """A `SQLAlchemyAsyncRepository` subclass with `model_type` set to the role model."""
     role_create_dto: type[SQLAlchemyDTO]
     """A `SQLAlchemyDTO` subclass for role creation."""
     role_read_dto: type[SQLAlchemyDTO]
@@ -257,7 +259,7 @@ class VerificationHandlerConfig:
 
 
 @dataclass
-class LitestarUsersConfig(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):
+class LitestarUsersConfig(Generic[SQLAUserT, SQLAOAuthAccountT]):
     """Configuration class for LitestarUsers."""
 
     auth_config: JWTAuthConfig | JWTCookieAuthConfig | BaseBackendConfig
@@ -272,8 +274,6 @@ class LitestarUsersConfig(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):
     Used for password-reset / verification JWTs as well as for JWT auth backends.
     Must be 16, 24 or 32 characters.
     """
-    user_model: type[SQLAUserT]
-    """A subclass of a `User` ORM model."""
     user_service_class: type[BaseUserService]
     """A subclass of [BaseUserService][litestar_users.service.BaseUserService]."""
     user_registration_dto: type[DataclassDTO | MsgspecDTO | PydanticDTO]  # pyright: ignore[reportInvalidTypeForm, assignment]
@@ -282,8 +282,8 @@ class LitestarUsersConfig(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):
     """A `User` model based SQLAlchemy DTO class."""
     user_update_dto: type[SQLAlchemyDTO]
     """A `User` model based SQLAlchemy DTO class."""
-    user_repository_class: type[SQLAlchemyUserRepository] = SQLAlchemyUserRepository
-    """The user repository class to use."""
+    user_repository_class: type[SQLAlchemyAsyncRepository]
+    """A `SQLAlchemyAsyncRepository` subclass with `model_type` set to the user model."""
     authentication_request_schema: Any = AuthenticationSchema
     """The schema to use for authentication requests.
 
@@ -303,13 +303,10 @@ class LitestarUsersConfig(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):
     Defaults to `["argon2"]`
     """
 
-    oauth_account_model: type[SQLAOAuthAccountT] | None = None
-    """A `OAuthAccount` ORM model."""
-    role_model: type[SQLARoleT] | None = None
-    """A `Role` ORM model.
+    oauth_account_repository_class: type[SQLAlchemyAsyncRepository] | None = None
+    """A `SQLAlchemyAsyncRepository` subclass with `model_type` set to the OAuth account model.
 
-    Notes:
-        - Required if `role_management_handler_config` is set.
+    Required if `oauth2_handler_config` or `oauth2_associate_handler_config` is set.
     """
     user_auth_identifier: str = DEFAULT_USER_AUTH_IDENTIFIER
     """The identifying attribute to use during user authentication. Defaults to `'email'`.
@@ -399,8 +396,6 @@ class LitestarUsersConfig(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):
             raise ImproperlyConfiguredException("secret must be 16, 24 or 32 characters")
         if all(getattr(self, config) is None for config in handler_configs):
             raise ImproperlyConfiguredException("at least one route handler must be configured")
-        if self.role_management_handler_config and self.role_model is None:
-            raise ImproperlyConfiguredException("role_model must be set when role_management_handler_config is set")
 
         for field_ in self.user_read_dto.generate_field_definitions(self.user_read_dto.model_type):  # pyright: ignore
             if field_.name in USER_READ_DTO_EXCLUDED_FIELDS:

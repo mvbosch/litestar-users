@@ -5,6 +5,7 @@ import uvicorn
 from advanced_alchemy.base import UUIDBase
 from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO, SQLAlchemyDTOConfig
 from advanced_alchemy.extensions.litestar.plugins import SQLAlchemyAsyncConfig, SQLAlchemyInitPlugin
+from advanced_alchemy.repository import SQLAlchemyAsyncRepository
 from httpx_oauth.clients.google import GoogleOAuth2
 from litestar import Litestar, Request
 from litestar.dto import DataclassDTO
@@ -77,6 +78,14 @@ sqlalchemy_config = SQLAlchemyAsyncConfig(
 )
 
 
+class UserRepository(SQLAlchemyAsyncRepository[User]):
+    model_type = User
+
+
+class OAuthAccountRepository(SQLAlchemyAsyncRepository[OAuthAccount]):
+    model_type = OAuthAccount
+
+
 # See https://frankie567.github.io/httpx-oauth/ for more details
 oauth_client = GoogleOAuth2("CLIENT_ID", "CLIENT_SECRET", name="google")
 
@@ -91,7 +100,7 @@ litestar_users_plugin = LitestarUsersPlugin(
     config=LitestarUsersConfig(
         auth_config=ServerSideSessionConfig(),
         secret=ENCODING_SECRET,
-        user_model=User,  # pyright: ignore
+        user_repository_class=UserRepository,
         user_read_dto=UserReadDTO,
         user_registration_dto=UserRegistrationDTO,
         user_update_dto=UserUpdateDTO,
@@ -102,7 +111,7 @@ litestar_users_plugin = LitestarUsersPlugin(
         register_handler_config=RegisterHandlerConfig(),
         user_management_handler_config=UserManagementHandlerConfig(guards=[roles_required("administrator")]),
         verification_handler_config=VerificationHandlerConfig(),
-        oauth_account_model=OAuthAccount,  # pyright: ignore
+        oauth_account_repository_class=OAuthAccountRepository,
         oauth2_handler_config=[
             OAuth2HandlerConfig(
                 oauth_client=oauth_client,

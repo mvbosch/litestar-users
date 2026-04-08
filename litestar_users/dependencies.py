@@ -5,10 +5,6 @@ from typing import TYPE_CHECKING, Any
 from advanced_alchemy.extensions.litestar.plugins import SQLAlchemyAsyncConfig
 from litestar.exceptions import ImproperlyConfiguredException
 
-from litestar_users.repository import (
-    SQLAlchemyOAuthAccountRepository,
-    SQLAlchemyRoleRepository,
-)
 from litestar_users.utils import get_litestar_users_plugin, get_sqlalchemy_plugin
 
 __all__ = ["provide_current_user", "provide_user_service"]
@@ -54,24 +50,26 @@ def provide_user_service(state: State, request: Request) -> BaseUserService:
     litestar_users_config = get_litestar_users_plugin(request.app)._config
     user_repository = litestar_users_config.user_repository_class(
         session=session,
-        model_type=litestar_users_config.user_model,
         auto_commit=litestar_users_config.auto_commit_transactions,
     )
-    role_repository: SQLAlchemyRoleRepository | None = (
+    role_repo_class = (
+        litestar_users_config.role_management_handler_config.role_repository_class
+        if litestar_users_config.role_management_handler_config
+        else None
+    )
+    role_repository = (
         None
-        if litestar_users_config.role_model is None
-        else SQLAlchemyRoleRepository(
+        if role_repo_class is None
+        else role_repo_class(
             session=session,
-            model_type=litestar_users_config.role_model,
             auto_commit=litestar_users_config.auto_commit_transactions,
         )
     )
-    oauth2_repository: SQLAlchemyOAuthAccountRepository | None = (
+    oauth2_repository = (
         None
-        if litestar_users_config.oauth_account_model is None
-        else SQLAlchemyOAuthAccountRepository(
+        if litestar_users_config.oauth_account_repository_class is None
+        else litestar_users_config.oauth_account_repository_class(
             session=session,
-            model_type=litestar_users_config.oauth_account_model,
             auto_commit=litestar_users_config.auto_commit_transactions,
         )
     )

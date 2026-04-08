@@ -29,8 +29,13 @@ def _make_mock_app(role_model: Any = MagicMock(), user_model: Any = None) -> Mag
         user_model = MagicMock(return_value=MagicMock())
 
     config = MagicMock()
-    config.role_model = role_model
-    config.user_model = user_model
+    config.user_repository_class = MagicMock()
+    config.user_repository_class.model_type = user_model
+    if role_model is None:
+        config.role_management_handler_config = None
+    else:
+        config.role_management_handler_config = MagicMock()
+        config.role_management_handler_config.role_repository_class.model_type = role_model
 
     plugin = MagicMock()
     plugin._config = config

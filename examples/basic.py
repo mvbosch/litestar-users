@@ -7,6 +7,7 @@ import uvicorn
 from advanced_alchemy.base import UUIDBase
 from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO, SQLAlchemyDTOConfig
 from advanced_alchemy.extensions.litestar.plugins import SQLAlchemyAsyncConfig, SQLAlchemyInitPlugin
+from advanced_alchemy.repository import SQLAlchemyAsyncRepository
 from litestar import Litestar, Request
 from litestar.dto import DataclassDTO
 from litestar.exceptions import NotAuthorizedException
@@ -89,11 +90,15 @@ async def on_startup() -> None:
         await conn.run_sync(UUIDBase.metadata.create_all)
 
 
+class UserRepository(SQLAlchemyAsyncRepository[User]):
+    model_type = User
+
+
 litestar_users = LitestarUsersPlugin(
     config=LitestarUsersConfig(
         auth_config=ServerSideSessionConfig(),
         secret=ENCODING_SECRET,
-        user_model=User,  # pyright: ignore
+        user_repository_class=UserRepository,
         user_read_dto=UserReadDTO,
         user_registration_dto=UserRegistrationDTO,
         user_update_dto=UserUpdateDTO,

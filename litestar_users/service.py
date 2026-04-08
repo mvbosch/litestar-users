@@ -29,16 +29,11 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from advanced_alchemy.filters import StatementFilter
-    from advanced_alchemy.repository import LoadSpec
+    from advanced_alchemy.repository import LoadSpec, SQLAlchemyAsyncRepository
     from advanced_alchemy.repository.typing import OrderingPair
     from litestar import Request
     from sqlalchemy.sql import ColumnElement
 
-    from litestar_users.repository import (
-        SQLAlchemyOAuthAccountRepository,
-        SQLAlchemyRoleRepository,
-        SQLAlchemyUserRepository,
-    )
     from litestar_users.schema import AuthenticationSchema
 
 
@@ -60,10 +55,10 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
         self,
         secret: str,
         user_auth_identifier: str,
-        user_repository: SQLAlchemyUserRepository[SQLAUserT],
+        user_repository: SQLAlchemyAsyncRepository[SQLAUserT],
         hash_schemes: Sequence[str] | None = None,
-        role_repository: SQLAlchemyRoleRepository[SQLARoleT, SQLAUserT] | None = None,
-        oauth2_repository: SQLAlchemyOAuthAccountRepository[SQLAOAuthAccountT, SQLAUserT] | None = None,
+        role_repository: SQLAlchemyAsyncRepository[SQLARoleT] | None = None,
+        oauth2_repository: SQLAlchemyAsyncRepository[SQLAOAuthAccountT] | None = None,
         require_verification_on_registration: bool = True,
     ) -> None:
         """User service constructor.
@@ -622,6 +617,33 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
 
         return user
 
+    async def _create_user_with_oauth_account(
+        self,
+        account_email: str,
+        is_verified_by_default: bool,
+        oauth_account_dict: dict[str, Any],
+        request: Request | None,
+    ) -> SQLAUserT:
+        """Create a new user and attach their first OAuth account."""
+        if self.oauth2_repository is None:  # pragma: no cover
+            raise ImproperlyConfiguredException("oauth2 has not been configured")
+        password = self.password_manager.generate()
+        user = await self.user_repository.add(
+            self.user_model(  # type: ignore[arg-type]
+                email=account_email,
+                password_hash=self.password_manager.hash(password),
+                is_verified=is_verified_by_default,
+                is_active=True,
+            )
+        )
+        if not hasattr(user, "oauth_accounts"):
+            raise ImproperlyConfiguredException("User.oauth_accounts is not set") from None
+        new_oauth_account = self.oauth2_model(**oauth_account_dict)
+        user.oauth_accounts.append(new_oauth_account)  # pyright: ignore
+        await self.oauth2_repository.add(new_oauth_account)
+        await self.post_registration_hook(user, request)
+        return user
+
     async def _oauth2_callback(
         self,
         oauth_name: str,
@@ -649,32 +671,30 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
                 user = await self.get_user_by(email=account_email)
                 if user is None:
                     raise NotFoundError()
-                user = await self.oauth2_repository.add_oauth_account(user, oauth_account_dict)
+                if not hasattr(user, "oauth_accounts"):
+                    raise ImproperlyConfiguredException("User.oauth_accounts is not set")
+                new_oauth_account = self.oauth2_model(**oauth_account_dict)
+                user.oauth_accounts.append(new_oauth_account)  # type: ignore[union-attr]  # pyright: ignore
+                await self.oauth2_repository.add(new_oauth_account)
             except NotFoundError:
                 if not associate_by_email:
                     raise HTTPException(
                         status_code=status_codes.HTTP_400_BAD_REQUEST, detail="User already exists."
                     ) from None
-                # Create account
-                password = self.password_manager.generate()
-                user_dict = {
-                    "email": account_email,
-                    "password_hash": self.password_manager.hash(password),
-                    "is_verified": is_verified_by_default,
-                    "is_active": True,
-                }
-                user = await self.user_repository.add(self.user_model(**user_dict))  # type: ignore[arg-type]
-                user = await self.oauth2_repository.add_oauth_account(user, oauth_account_dict)
-                await self.post_registration_hook(user, request)
+                # Create new user and associate OAuth account
+                user = await self._create_user_with_oauth_account(
+                    account_email=account_email,
+                    is_verified_by_default=is_verified_by_default,
+                    oauth_account_dict=oauth_account_dict,
+                    request=request,
+                )
         else:
             # Update oauth
             for existing_oauth_account in user.oauth_accounts:  # type: ignore[union-attr]
                 if existing_oauth_account.account_id == account_id and existing_oauth_account.oauth_name == oauth_name:
-                    user = await self.oauth2_repository.update_oauth_account(
-                        user,
-                        cast("SQLAOAuthAccountT", existing_oauth_account),
-                        oauth_account_dict,
-                    )
+                    for key, value in oauth_account_dict.items():
+                        setattr(existing_oauth_account, key, value)
+                    await self.oauth2_repository.update(cast("SQLAOAuthAccountT", existing_oauth_account))
 
         return user
 
@@ -694,7 +714,12 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
 
         if state_data["sub"] != str(associate_user.id):
             raise HTTPException(status_code=status_codes.HTTP_400_BAD_REQUEST)
-        return await self.oauth2_repository.add_oauth_account(associate_user, oauth_account_dict)
+        if not hasattr(associate_user, "oauth_accounts"):
+            raise ImproperlyConfiguredException("User.oauth_accounts is not set")
+        new_oauth_account = self.oauth2_model(**oauth_account_dict)
+        associate_user.oauth_accounts.append(new_oauth_account)  # pyright: ignore
+        await self.oauth2_repository.add(new_oauth_account)
+        return associate_user
 
     async def oauth2_authorize(
         self,

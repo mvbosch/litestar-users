@@ -8,8 +8,6 @@ from advanced_alchemy.extensions.litestar.plugins import SQLAlchemyInitPlugin
 from litestar.exceptions import ImproperlyConfiguredException
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
-from litestar_users.repository import SQLAlchemyRoleRepository
-
 if TYPE_CHECKING:
     from litestar import Litestar
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,9 +55,17 @@ def get_user_service(app: Litestar, session: AsyncSession) -> BaseUserService[An
 
     config = get_litestar_users_plugin(app)._config
 
-    user_repository = config.user_repository_class(session, config.user_model)
-    role_repository: SQLAlchemyRoleRepository | None = (
-        SQLAlchemyRoleRepository(session, config.role_model) if config.role_model else None
+    user_repository = config.user_repository_class(
+        session=session,
+        auto_commit=config.auto_commit_transactions,
+    )
+    role_repository = (
+        config.role_management_handler_config.role_repository_class(
+            session=session,
+            auto_commit=config.auto_commit_transactions,
+        )
+        if config.role_management_handler_config
+        else None
     )
     return config.user_service_class(
         user_auth_identifier=config.user_auth_identifier,

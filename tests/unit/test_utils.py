@@ -119,14 +119,14 @@ async def test_async_session_yields_session() -> None:
 
 
 def test_get_user_service_without_role_model(monkeypatch: pytest.MonkeyPatch) -> None:
-    """When config.role_model is None, role_repository should be None."""
+    """When role_management_handler_config is None, role_repository should be None."""
 
     app = _make_app()
     session = MagicMock()
 
     users_plugin = get_litestar_users_plugin(app)
     config = users_plugin._config
-    config.role_model = None
+    config.role_management_handler_config = None
     config.user_auth_identifier = "email"
     config.secret = "secret-key-32-bytes-long-abcdefg"
     config.hash_schemes = ["argon2"]
@@ -151,14 +151,13 @@ def test_get_user_service_without_role_model(monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_get_user_service_with_role_model(monkeypatch: pytest.MonkeyPatch) -> None:
-    """When config.role_model is set, role_repository should be provided."""
+    """When role_management_handler_config is set, role_repository should be provided."""
 
     app = _make_app()
     session = MagicMock()
 
     users_plugin = get_litestar_users_plugin(app)
     config = users_plugin._config
-    config.role_model = MagicMock()
     config.user_auth_identifier = "email"
     config.secret = "secret-key-32-bytes-long-abcdefg"
     config.hash_schemes = ["argon2"]
@@ -176,7 +175,8 @@ def test_get_user_service_with_role_model(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(config, "user_service_class", _svc_factory)
 
     fake_role_repo = MagicMock()
-    monkeypatch.setattr("litestar_users.utils.SQLAlchemyRoleRepository", MagicMock(return_value=fake_role_repo))
+    config.role_management_handler_config = MagicMock()
+    config.role_management_handler_config.role_repository_class = MagicMock(return_value=fake_role_repo)
 
     get_user_service(app, session)
 

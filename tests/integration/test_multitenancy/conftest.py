@@ -8,6 +8,7 @@ from uuid import UUID
 import pytest
 from advanced_alchemy.base import UUIDBase
 from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO, SQLAlchemyDTOConfig
+from advanced_alchemy.repository import SQLAlchemyAsyncRepository
 from litestar import Litestar, Request
 from litestar.dto import DataclassDTO
 from litestar.middleware.session.server_side import ServerSideSessionConfig
@@ -167,12 +168,15 @@ async def _seed_db(
 
 @pytest.fixture()
 def multitenant_litestar_users_config(models: TestMultitenantModels) -> LitestarUsersConfig:
+    class UserRepository(SQLAlchemyAsyncRepository):
+        model_type = models["User"]
+
     return LitestarUsersConfig(  # pyright: ignore
         auth_config=JWTAuthConfig(),
         authentication_request_schema=models["CustomAuthenticationSchema"],
         user_auth_identifier="username",
         secret=ENCODING_SECRET,
-        user_model=models["User"],  # pyright: ignore
+        user_repository_class=UserRepository,
         user_read_dto=models["UserReadDTO"],
         user_update_dto=models["UserUpdateDTO"],
         user_registration_dto=models["UserRegistrationDTO"],
