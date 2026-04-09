@@ -42,7 +42,6 @@ async def _get_user_from_sub(sub: str, connection: ASGIConnection) -> Any | None
     session = sqlalchemy_config.provide_session(state=connection.app.state, scope=connection.scope)
     repository = litestar_users_config.user_repository_class(
         session=session,
-        model_type=litestar_users_config.user_model,
         auto_commit=litestar_users_config.auto_commit_transactions,
     )
     try:

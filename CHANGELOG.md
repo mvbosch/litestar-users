@@ -4,18 +4,20 @@
 
 - **breaking**: replace `auth_backend_class` and `session_backend_config` with a single `auth_config` field on `LitestarUsersConfig`. Pass `ServerSideSessionConfig`, `CookieBackendConfig`, `JWTAuthConfig`, or `JWTCookieAuthConfig` directly.
 - **breaking**: add `JWTAuthConfig` and `JWTCookieAuthConfig` dataclasses replacing the previous JWT backend class approach.
+- **breaking**: remove `SQLAlchemyUserRepository`, `SQLAlchemyRoleRepository`, and `SQLAlchemyOAuthAccountRepository`. Consumers must now subclass `SQLAlchemyAsyncRepository` from `advanced-alchemy` directly and set `model_type` as a class variable.
+- **breaking**: remove `user_model`, `role_model`, and `oauth_account_model` from `LitestarUsersConfig`. The model is now inferred from the repository's `model_type` class variable.
+- **breaking**: add param `user_repository_class: type[SQLAlchemyAsyncRepository]` on `LitestarUsersConfig` (required).
+- **breaking**: replace `oauth_account_model` with `oauth_account_repository_class: type[SQLAlchemyAsyncRepository] | None` on `LitestarUsersConfig`.
+- **breaking**: add `role_repository_class: type[SQLAlchemyAsyncRepository]` as a required field on `RoleManagementHandlerConfig`; `role_model` is inferred from it.
 - **breaking**: move `role_create_dto`, `role_read_dto`, and `role_update_dto` from `LitestarUsersConfig` to `RoleManagementHandlerConfig` as required positional fields.
-- **breaking**: remove `assign_role` and `revoke_role` from `SQLAlchemyRoleRepository`; role mutations are now handled in `BaseUserService` via `user_repository.update()`.
-- **breaking**: remove `_update` from `SQLAlchemyUserRepository`; password rehash on login now uses `user_repository.update()` directly.
 - **breaking**: mixins are now importable from `litestar_users.mixins` (previously only `litestar_users.adapter.sqlalchemy.mixins`).
 - **breaking**: role guards now raise the correct HTTP 403 status exception instead of the incorrect 401.
-- **breaking** rename `id_` parameter to `user_id` on `BaseUserService.get_user` and `delete_user` for consistency.
+- **breaking**: rename `id_` parameter to `user_id` on `BaseUserService.get_user` and `delete_user` for consistency.
 - **breaking**: rename `data` parameter to `user` on `BaseUserService.update_user`.
 - **breaking**: rename `id_` parameter to `role_id` on `BaseUserService.get_role` and `delete_role`.
 - **breaking**: remove the `id_` positional parameter from `BaseUserService.update_role`; callers must set `data.id` before invoking.
 - add `AnonymousUser` and `no_validation` for opt-in anonymous access on individual route handlers.
 - add `OAuth2HandlerConfig` to `__all__` in `litestar_users.config`.
-- fix repository `add_oauth_account` and `update_oauth_account` to use `self.add()`/`self.update()` for consistent `auto_commit` behaviour.
 - add example tests covering registration, login, duplicate rejection, and route registration for all three example applications.
 - update documentation to reflect all API changes.
 - add `BaseUserService.get_additional_auth_filters` method.

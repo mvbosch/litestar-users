@@ -11,6 +11,7 @@ from advanced_alchemy.base import UUIDBase
 from advanced_alchemy.config import AsyncSessionConfig
 from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO, SQLAlchemyDTOConfig
 from advanced_alchemy.extensions.litestar.plugins import SQLAlchemyAsyncConfig, SQLAlchemyInitPlugin
+from advanced_alchemy.repository import SQLAlchemyAsyncRepository
 from litestar import Litestar
 from litestar.datastructures import State
 from litestar.dto import DataclassDTO
@@ -200,12 +201,15 @@ def sqlalchemy_plugin(sqlalchemy_plugin_config: SQLAlchemyAsyncConfig) -> SQLAlc
     ],
 )
 def litestar_users_config(request: pytest.FixtureRequest, models: TestModels) -> LitestarUsersConfig:
+    class UserRepository(SQLAlchemyAsyncRepository):
+        model_type = models["User"]
+
     return LitestarUsersConfig(  # pyright: ignore
         auth_config=request.param,
         authentication_request_schema=models["CustomAuthenticationSchema"],
         user_auth_identifier="username",
         secret=ENCODING_SECRET,
-        user_model=models["User"],  # pyright: ignore
+        user_repository_class=UserRepository,
         user_registration_dto=models["UserRegistrationDTO"],
         user_read_dto=models["UserReadDTO"],
         user_update_dto=models["UserUpdateDTO"],

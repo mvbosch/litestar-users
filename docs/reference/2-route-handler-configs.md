@@ -29,6 +29,10 @@
 ::: litestar_users.config.RoleManagementHandlerConfig
     options:
         members:
+            - role_repository_class
+            - role_create_dto
+            - role_read_dto
+            - role_update_dto
             - path_prefix
             - assign_role_path
             - revoke_role_path

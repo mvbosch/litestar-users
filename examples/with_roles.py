@@ -5,6 +5,7 @@ import uvicorn
 from advanced_alchemy.base import UUIDBase, orm_registry
 from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO, SQLAlchemyDTOConfig
 from advanced_alchemy.extensions.litestar.plugins import SQLAlchemyAsyncConfig, SQLAlchemyInitPlugin
+from advanced_alchemy.repository import SQLAlchemyAsyncRepository
 from litestar import Litestar, Request
 from litestar.dto import DataclassDTO
 from litestar.middleware.session.server_side import ServerSideSessionConfig
@@ -86,6 +87,14 @@ class UserService(BaseUserService[User, Role, Any]):  # type: ignore[type-var]
         user.login_count += 1  # pyright: ignore
 
 
+class UserRepository(SQLAlchemyAsyncRepository[User]):
+    model_type = User
+
+
+class RoleRepository(SQLAlchemyAsyncRepository[Role]):
+    model_type = Role
+
+
 sqlalchemy_config = SQLAlchemyAsyncConfig(
     connection_string=DATABASE_URL,
     session_dependency_key="session",
@@ -103,17 +112,17 @@ litestar_users_plugin = LitestarUsersPlugin(
     config=LitestarUsersConfig(
         auth_config=ServerSideSessionConfig(),
         secret=ENCODING_SECRET,
-        user_model=User,  # pyright: ignore
+        user_repository_class=UserRepository,
         user_read_dto=UserReadDTO,
         user_registration_dto=UserRegistrationDTO,
         user_update_dto=UserUpdateDTO,
-        role_model=Role,  # pyright: ignore
         user_service_class=UserService,  # pyright: ignore
         auth_handler_config=AuthHandlerConfig(),
         current_user_handler_config=CurrentUserHandlerConfig(),
         password_reset_handler_config=PasswordResetHandlerConfig(),
         register_handler_config=RegisterHandlerConfig(),
         role_management_handler_config=RoleManagementHandlerConfig(
+            role_repository_class=RoleRepository,
             role_create_dto=RoleCreateDTO,
             role_read_dto=RoleReadDTO,
             role_update_dto=RoleUpdateDTO,

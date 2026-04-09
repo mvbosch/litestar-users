@@ -79,7 +79,9 @@ def create_user(
             password_hash = user_service.password_manager.hash(password)
             try:
                 user = await user_service.add_user(
-                    user=litestar_users_config.user_model(email=email, password_hash=password_hash, **kwargs),
+                    user=litestar_users_config.user_repository_class.model_type(  # pyright: ignore[reportGeneralTypeIssues]
+                        email=email, password_hash=password_hash, **kwargs
+                    ),
                     activate=is_active,
                     verify=is_verified,
                 )
@@ -110,11 +112,15 @@ def create_role(app: Litestar, name: str | None, description: str | None) -> Non
     async def _create_role() -> None:
         async with async_session(app) as session:
             user_service = get_user_service(app, session)
-            if litestar_users_config.role_model is None:
+            if litestar_users_config.role_management_handler_config is None:
                 echo("Role model is not defined")
                 sys.exit(1)
             try:
-                role = await user_service.add_role(litestar_users_config.role_model(name=name, description=description))
+                role = await user_service.add_role(
+                    litestar_users_config.role_management_handler_config.role_repository_class.model_type(  # pyright: ignore[reportGeneralTypeIssues]
+                        name=name, description=description
+                    )
+                )
                 await session.commit()
                 echo(f"Role {role.id} created successfully.")
             except IntegrityError as e:
@@ -137,7 +143,7 @@ def assign_role(
     """Assign a role to a user."""
 
     litestar_users_config = get_litestar_users_plugin(app)._config
-    if litestar_users_config.role_model is None:
+    if litestar_users_config.role_management_handler_config is None:
         echo("Role model is not defined")
         sys.exit(1)
 

@@ -6,6 +6,7 @@ from uuid import UUID
 import pytest
 from advanced_alchemy.base import UUIDBase
 from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO, SQLAlchemyDTOConfig
+from advanced_alchemy.repository import SQLAlchemyAsyncRepository
 from litestar.dto import DataclassDTO
 from litestar.middleware.session.server_side import ServerSideSessionConfig
 from sqlalchemy import ForeignKey, Text, Uuid
@@ -162,16 +163,22 @@ def generic_user(models: TestRoleModels) -> Any:
     ],
 )
 def litestar_users_config(request: pytest.FixtureRequest, models: TestRoleModels) -> LitestarUsersConfig:
+    class UserRepository(SQLAlchemyAsyncRepository):
+        model_type = models["User"]
+
+    class RoleRepository(SQLAlchemyAsyncRepository):
+        model_type = models["Role"]
+
     return LitestarUsersConfig(  # pyright: ignore
         auth_config=request.param,
         secret=ENCODING_SECRET,
-        user_model=models["User"],  # pyright: ignore
+        user_repository_class=UserRepository,
         user_read_dto=models["UserReadDTO"],
         user_registration_dto=models["UserRegistrationDTO"],
         user_update_dto=models["UserUpdateDTO"],
-        role_model=models["Role"],  # pyright: ignore
         user_service_class=UserService,
         role_management_handler_config=RoleManagementHandlerConfig(
+            role_repository_class=RoleRepository,
             role_create_dto=models["RoleCreateDTO"],
             role_read_dto=models["RoleReadDTO"],
             role_update_dto=models["RoleUpdateDTO"],

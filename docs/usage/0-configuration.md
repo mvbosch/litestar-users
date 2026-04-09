@@ -14,22 +14,23 @@ from typing import Any
 
 import uvicorn
 from advanced_alchemy.base import UUIDBase
-from litestar import Litestar
 from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO, SQLAlchemyDTOConfig
 from advanced_alchemy.extensions.litestar.plugins import (
     SQLAlchemyAsyncConfig,
     SQLAlchemyInitPlugin,
 )
+from advanced_alchemy.repository import SQLAlchemyAsyncRepository
+from litestar import Litestar
 from litestar.dto import DataclassDTO
 from litestar.middleware.session.server_side import ServerSideSessionConfig
 
-from litestar_users import LitestarUsersPlugin, LitestarUsersConfig
-from litestar_users.mixins import SQLAlchemyUserMixin
+from litestar_users import LitestarUsersConfig, LitestarUsersPlugin
 from litestar_users.config import (
     AuthHandlerConfig,
     RegisterHandlerConfig,
     VerificationHandlerConfig,
 )
+from litestar_users.mixins import SQLAlchemyUserMixin
 from litestar_users.service import BaseUserService
 
 ENCODING_SECRET = "1234567890abcdef"  # noqa: S105
@@ -38,6 +39,10 @@ DATABASE_URL = "sqlite+aiosqlite:///"
 
 class User(UUIDBase, SQLAlchemyUserMixin):
     """User model."""
+
+
+class UserRepository(SQLAlchemyAsyncRepository[User]):
+    model_type = User
 
 
 @dataclass
@@ -73,7 +78,7 @@ litestar_users = LitestarUsersPlugin(
     config=LitestarUsersConfig(
         auth_config=ServerSideSessionConfig(),
         secret=ENCODING_SECRET,
-        user_model=User,  # pyright: ignore
+        user_repository_class=UserRepository,
         user_read_dto=UserReadDTO,
         user_registration_dto=UserRegistrationDTO,
         user_update_dto=UserUpdateDTO,
@@ -152,4 +157,4 @@ async def feed(
 `AnonymousUser` exposes the same base attributes as a real user (`id`, `is_active`, `is_verified`, `roles`, `oauth_accounts`) with safe sentinel defaults, so code that inspects those fields does not need special-casing.
 
 !!! note
-    The `no_validation` annotation is required because msgspec cannot coerce a union of two custom types. Without it Litestar will raise a validation error when it tries to deserialise the dependency. It is simply `Dependency(skip_validation=True)` — you can use that directly if you prefer not to import `no_validation`.
+    The `no_validation` annotation is required because msgspec cannot coerce a union of two custom types. Without it Litestar will raise a validation error when it tries to deserialise the dependency. It is simply `Dependency(skip_validation=True)` - you can use that directly if you prefer not to import `no_validation`.

@@ -1,6 +1,6 @@
 [project]
 name = "litestar-users"
-version = "2.0.0rc1"
+version = "2.0.0rc2"
 description = "Authentication and user management for Litestar"
 authors = [{ name = "Michael Bosch", email = "michael@vonbosch.co.za" }]
 requires-python = ">=3.10"
@@ -12,7 +12,7 @@ dependencies = [
     "argon2-cffi",
     "pyyaml!=5.4.*",
     "libpass>=1.8.1,<2",
-    "advanced-alchemy>=0.31.0",
+    "advanced-alchemy>=1.9.3,<2",
     "pyjwt>=2.10.1",
 ]
 

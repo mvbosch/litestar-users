@@ -83,9 +83,13 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
                 "UserRoleSchema": UserRoleSchema,
                 "UserServiceType": self._config.user_service_class,
                 "BaseUserService": self._config.user_service_class,
-                "SQLAUserT": self._config.user_model,
-                "SQLARoleT": self._config.role_model,
-                "SQLAOAuthAccountT": self._config.oauth_account_model,
+                "SQLAUserT": self._config.user_repository_class.model_type,  # pyright: ignore[reportGeneralTypeIssues]
+                "SQLARoleT": self._config.role_management_handler_config.role_repository_class.model_type  # pyright: ignore[reportGeneralTypeIssues]
+                if self._config.role_management_handler_config
+                else None,
+                "SQLAOAuthAccountT": self._config.oauth_account_repository_class.model_type  # pyright: ignore[reportGeneralTypeIssues]
+                if self._config.oauth_account_repository_class
+                else None,
                 "user_read_dto": self._config.user_read_dto,
                 "user_update_dto": self._config.user_update_dto,
                 "user_registration_dto": self._config.user_registration_dto,
@@ -207,16 +211,17 @@ class LitestarUsersPlugin(InitPluginProtocol, CLIPluginProtocol):
             app_config.openapi_config.security = [security_requirement]
 
     def _get_user_identifier_uri(self) -> str:
-        if isinstance(self._config.user_model.id.type, (GUID, Uuid)):
+        if isinstance(self._config.user_repository_class.model_type.id.type, (GUID, Uuid)):  # pyright: ignore[reportGeneralTypeIssues]
             return "/{user_id:uuid}"
-        if isinstance(self._config.user_model.id.type, BigInteger):
+        if isinstance(self._config.user_repository_class.model_type.id.type, BigInteger):  # pyright: ignore[reportGeneralTypeIssues]
             return "/{user_id:int}"
         raise ValueError("user identifier type not supported")
 
     def _get_role_identifier_uri(self) -> str:
-        if isinstance(self._config.role_model.id.type, (GUID, Uuid)):  # type: ignore[union-attr]
+        role_model = self._config.role_management_handler_config.role_repository_class.model_type  # type: ignore[union-attr]  # pyright: ignore[reportGeneralTypeIssues]
+        if isinstance(role_model.id.type, (GUID, Uuid)):
             return "/{role_id:uuid}"
-        if isinstance(self._config.role_model.id.type, BigInteger):  # type: ignore[union-attr]
+        if isinstance(role_model.id.type, BigInteger):
             return "/{role_id:int}"
         raise ValueError("role identifier type not supported")
 
