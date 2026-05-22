@@ -85,17 +85,41 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
         self.user_auth_identifier = user_auth_identifier
         self.require_verification_on_registration = require_verification_on_registration
 
-    async def add_user(self, user: SQLAUserT, verify: bool = False, activate: bool = True) -> SQLAUserT:
-        """Create a new user programmatically.
+    async def add_user(
+        self,
+        user: SQLAUserT,
+        verify: bool = False,
+        activate: bool = True,
+        additional_lookup_filters: "Sequence[ColumnElement[bool]] | None" = None,
+    ) -> SQLAUserT:
+        """Perform a collision lookup and add a new user.
+
+        This method is the low-level entry point for inserting a user into the database. It is
+        intended for programmatic or administrative use (e.g. an admin route handler that creates
+        users on behalf of others). Callers are responsible for constructing and passing any
+        ``additional_lookup_filters`` themselves.
+
+        For the self-service registration flow, prefer [register][litestar_users.service.BaseUserService.register],
+        which orchestrates pre/post hooks and automatically applies filters returned by
+        [get_registration_lookup_filters][litestar_users.service.BaseUserService.get_registration_lookup_filters].
 
         Args:
             user: User model instance.
             verify: Set the user's verification status to this value.
             activate: Set the user's active status to this value.
+            additional_lookup_filters: Additional filters to apply when checking for existing users.
+                Note that [get_registration_lookup_filters][litestar_users.service.BaseUserService.get_registration_lookup_filters]
+                is *not* invoked here; if tenant-scoped or otherwise narrowed duplicate checks are
+                required, pass the filters explicitly.
+
+        Raises:
+            IntegrityError: If the value of the user's authentication identifier (e.g. email) is already associated with an existing account, or if any of the additional lookup filters match an existing user.
         """
+        filters = additional_lookup_filters or []
         user_exists = await self.user_repository.exists(
             func.lower(getattr(self.user_model, self.user_auth_identifier))
-            == getattr(user, self.user_auth_identifier).lower()
+            == getattr(user, self.user_auth_identifier).lower(),
+            *filters,
         )
         if user_exists:
             raise IntegrityError(f"{self.user_auth_identifier} already associated with an account")
@@ -116,8 +140,9 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
 
         data["password_hash"] = self.password_manager.hash(data.pop("password"))
 
+        additional_filters = self.get_registration_lookup_filters(data, request)
         verify = not self.require_verification_on_registration
-        user = await self.add_user(self.user_model(**data), verify=verify)  # type: ignore[arg-type]
+        user = await self.add_user(self.user_model(**data), verify=verify, additional_lookup_filters=additional_filters)  # type: ignore[arg-type]
 
         if self.require_verification_on_registration:
             await self.initiate_verification(user)
@@ -202,6 +227,28 @@ class BaseUserService(Generic[SQLAUserT, SQLARoleT, SQLAOAuthAccountT]):  # pyli
             user_id: UUID corresponding to a user primary key.
         """
         return await self.user_repository.delete(user_id)
+
+    def get_registration_lookup_filters(
+        self, data: dict[str, Any], request: Request | None = None
+    ) -> Sequence[ColumnElement[bool]]:
+        """Get additional filters to apply when checking for existing users during registration.
+
+        By default, registration checks for existing users solely by the configured
+        `user_auth_identifier` (e.g. ``email``). Override this method in a subclass to supply
+        additional SQLAlchemy filter expressions that will be applied when looking up potential
+        duplicate users during [register][litestar_users.service.BaseUserService.register].
+
+        Args:
+            data: User creation data as a dictionary (pre-model instantiation).
+            request: The litestar request that initiated the action.
+
+        Returns:
+            A list of SQLAlchemy filter expressions to apply to the duplicate-user lookup.
+
+        Notes:
+        - By default, no additional filters are applied.
+        """
+        return []
 
     def get_additional_auth_filters(self, data: Any, request: Request | None = None) -> Sequence[ColumnElement[bool]]:
         """Get additional filters to apply to the authentication query.

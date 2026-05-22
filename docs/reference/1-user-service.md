@@ -12,6 +12,7 @@
             - delete_user
             - authenticate
             - get_additional_auth_filters
+            - get_registration_lookup_filters
             - generate_token
             - initiate_verification
             - send_verification_token
