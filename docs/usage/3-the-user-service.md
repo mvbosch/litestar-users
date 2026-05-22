@@ -88,3 +88,32 @@ class UserService(BaseUserService[User, Any, Any]):
         company_id = request.headers.get("x-company-id", "") if request else ""
         return [User.company_id == company_id]
 ```
+
+### [`get_registration_lookup_filters`][litestar_users.service.BaseUserService.get_registration_lookup_filters]
+
+Returns extra SQLAlchemy filter expressions that are applied when checking for duplicate users during registration.
+
+By default, the duplicate check queries the database using only the configured `user_auth_identifier` (e.g. `email`). In multitenant setups where the same identifier may appear in multiple rows, you can narrow the lookup by overriding this method. Unlike `get_additional_auth_filters`, the `data` parameter here is the raw registration payload as a `dict` (before the model is instantiated).
+
+!!!warning
+    Values derived from the request (headers, query params, etc.) are client-controlled. Wherever possible prefer trusted sources such as server-signed cookies or tokens.
+
+```python
+from collections.abc import Sequence
+from typing import Any
+
+from litestar import Request
+from sqlalchemy.sql import ColumnElement
+
+from litestar_users.service import BaseUserService
+
+from local.models import User
+
+
+class UserService(BaseUserService[User, Any, Any]):
+    def get_registration_lookup_filters(
+        self, data: dict[str, Any], request: Request | None = None
+    ) -> Sequence[ColumnElement[bool]]:
+        company_id = request.headers.get("x-company-id", "") if request else ""
+        return [User.company_id == company_id]
+```
