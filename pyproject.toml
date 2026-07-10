@@ -7,7 +7,7 @@ requires-python = ">=3.10"
 readme = "README.md"
 license = "MIT"
 dependencies = [
-    "litestar[jwt, cli, sqlalchemy]>=2.9.0,<3",
+    "litestar[jwt, cli, sqlalchemy]>=2.23.0,<3",
     "cryptography",
     "argon2-cffi",
     "pyyaml!=5.4.*",

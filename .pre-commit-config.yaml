@@ -71,7 +71,7 @@ repos:
           [
             advanced_alchemy,
             asyncpg,
-            litestar,
+            litestar>=2.23.0,
             libpass,
             pyjwt,
             pytest,
@@ -90,7 +90,7 @@ repos:
           [
             advanced_alchemy,
             asyncpg,
-            litestar,
+            litestar>=2.23.0,
             libpass,
             pyjwt,
             pytest,
