@@ -5,14 +5,14 @@ from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from litestar import Request, Response, Router, delete, get, patch, post, put, status_codes
 from litestar.datastructures import Cookie
-from litestar.di import Provide
+from litestar.di import NamedDependency, Provide
 from litestar.enums import MediaType
 from litestar.exceptions import (
     HTTPException,
     NotAuthorizedException,
     PermissionDeniedException,
 )
-from litestar.params import Parameter
+from litestar.params import FromPath, FromQuery, JSONBody, PathParameter, QueryParameter
 from litestar.security.jwt.token import Token
 
 from litestar_users.config import JWTAuthConfig, JWTCookieAuthConfig
@@ -124,7 +124,11 @@ def get_registration_handler(
         exclude_from_auth=True,
         tags=tags,
     )
-    async def register(data: DTOData[UserRegisterT], service: UserServiceType, request: Request) -> SQLAUserT:
+    async def register(
+        data: JSONBody[DTOData[UserRegisterT]],
+        service: NamedDependency[UserServiceType],
+        request: Request,
+    ) -> SQLAUserT:
         """Register a new user."""
         return cast("SQLAUserT", await service.register(data.as_builtins(), request))
 
@@ -171,9 +175,9 @@ def get_oauth2_handler(
         opt=opt,
     )
     async def authorize(
-        service: UserServiceType,
+        service: NamedDependency[UserServiceType],
         request: Request,
-        scopes: list[str] | None = None,
+        scopes: FromQuery[list[str] | None] = None,
     ) -> OAuth2AuthorizeSchema:
         """OAuth2 route."""
         return await service.oauth2_authorize(
@@ -196,12 +200,12 @@ def get_oauth2_handler(
         opt=opt,
     )
     async def callback(
-        service: UserServiceType,
+        service: NamedDependency[UserServiceType],
         request: Request,
-        code_param: Annotated[str | None, Parameter(query="code")] = None,
-        code_verifier_param: Annotated[str | None, Parameter(query="code_verifier")] = None,
-        state_param: Annotated[str | None, Parameter(query="state")] = None,
-        error_param: Annotated[str | None, Parameter(query="error")] = None,
+        code_param: Annotated[str | None, QueryParameter(name="code")] = None,
+        code_verifier_param: Annotated[str | None, QueryParameter(name="code_verifier")] = None,
+        state_param: Annotated[str | None, QueryParameter(name="state")] = None,
+        error_param: Annotated[str | None, QueryParameter(name="error")] = None,
     ) -> Response[SQLAUserT]:
         """OAuth2 callback route."""
         user = await service.oauth2_callback(
@@ -272,9 +276,9 @@ def get_oauth2_associate_handler(
         opt=opt,
     )
     async def authorize(
-        service: UserServiceType,
+        service: NamedDependency[UserServiceType],
         request: Request,
-        scopes: list[str] | None = None,
+        scopes: FromQuery[list[str] | None] = None,
     ) -> OAuth2AuthorizeSchema:
         """OAuth2 route."""
         user_id = request.user.id
@@ -298,12 +302,12 @@ def get_oauth2_associate_handler(
         opt=opt,
     )
     async def callback(
-        service: UserServiceType,
+        service: NamedDependency[UserServiceType],
         request: Request,
-        code_param: Annotated[str | None, Parameter(query="code")] = None,
-        code_verifier_param: Annotated[str | None, Parameter(query="code_verifier")] = None,
-        state_param: Annotated[str | None, Parameter(query="state")] = None,
-        error_param: Annotated[str | None, Parameter(query="error")] = None,
+        code_param: Annotated[str | None, QueryParameter(name="code")] = None,
+        code_verifier_param: Annotated[str | None, QueryParameter(name="code_verifier")] = None,
+        state_param: Annotated[str | None, QueryParameter(name="state")] = None,
+        error_param: Annotated[str | None, QueryParameter(name="error")] = None,
     ) -> Response[SQLAUserT]:
         """OAuth2 callback route."""
         user_id = request.user.id
@@ -359,7 +363,7 @@ def get_verification_handler(
         exclude_from_auth=True,
         tags=tags,
     )
-    async def verify(token: str, service: UserServiceType, request: Request) -> SQLAUserT:
+    async def verify(token: FromQuery[str], service: NamedDependency[UserServiceType], request: Request) -> SQLAUserT:
         """Verify a user with a given JWT."""
 
         return cast("SQLAUserT", await service.verify(token, request))
@@ -398,7 +402,7 @@ def get_auth_handler(
     )
     async def login_session(
         data: authentication_schema,  # pyright: ignore
-        service: UserServiceType,
+        service: NamedDependency[UserServiceType],
         request: Request,
     ) -> SQLAUserT:
         """Authenticate a user."""
@@ -420,7 +424,7 @@ def get_auth_handler(
     )
     async def login_jwt(
         data: authentication_schema,  # pyright: ignore
-        service: UserServiceType,
+        service: NamedDependency[UserServiceType],
         request: Request,
     ) -> Response[SQLAUserT]:
         """Authenticate a user."""
@@ -461,10 +465,10 @@ def get_current_user_handler(
     """
 
     @get(path, return_dto=user_read_dto, tags=tags, opt=opt)
-    async def get_current_user(request: Request[SQLAUserT, Any, Any]) -> SQLAUserT:
+    async def get_current_user(current_user: NamedDependency[SQLAUserT]) -> SQLAUserT:
         """Get current user info."""
 
-        return request.user
+        return current_user
 
     @patch(
         path,
@@ -475,12 +479,12 @@ def get_current_user_handler(
         opt=opt,
     )
     async def update_current_user(
-        data: SQLAUserT,
-        request: Request[SQLAUserT, Any, Any],
-        service: UserServiceType,
+        data: JSONBody[SQLAUserT],
+        current_user: NamedDependency[SQLAUserT],
+        service: NamedDependency[UserServiceType],
     ) -> SQLAUserT:
         """Update the current user."""
-        data.id = request.user.id  # pyright: ignore[reportAttributeAccessIssue]
+        data.id = current_user.id  # pyright: ignore[reportAttributeAccessIssue]
         return cast("SQLAUserT", await service.update_user(user=data))
 
     return Router(path="/", route_handlers=[get_current_user, update_current_user])
@@ -501,7 +505,7 @@ def get_password_reset_handler(forgot_path: str, reset_path: str, tags: list[str
         exclude_from_auth=True,
         tags=tags,
     )
-    async def forgot_password(data: ForgotPasswordSchema, service: UserServiceType) -> None:
+    async def forgot_password(data: ForgotPasswordSchema, service: NamedDependency[UserServiceType]) -> None:
         await service.initiate_password_reset(data.email)
         return
 
@@ -511,7 +515,7 @@ def get_password_reset_handler(forgot_path: str, reset_path: str, tags: list[str
         exclude_from_auth=True,
         tags=tags,
     )
-    async def reset_password(data: ResetPasswordSchema, service: UserServiceType) -> None:
+    async def reset_password(data: ResetPasswordSchema, service: NamedDependency[UserServiceType]) -> None:
         await service.reset_password(data.token, data.password)
         return
 
@@ -551,7 +555,7 @@ def get_user_management_handler(
         dependencies={"service": Provide(provide_user_service, sync_to_thread=False)},
         tags=tags,
     )
-    async def get_user(user_id: UUID | int, service: UserServiceType) -> SQLAUserT:
+    async def get_user(user_id: FromPath[UUID | int], service: NamedDependency[UserServiceType]) -> SQLAUserT:
         """Get a user by id."""
 
         return cast("SQLAUserT", await service.get_user(user_id))
@@ -565,7 +569,9 @@ def get_user_management_handler(
         dependencies={"service": Provide(provide_user_service, sync_to_thread=False)},
         tags=tags,
     )
-    async def update_user(user_id: UUID | int, data: SQLAUserT, service: UserServiceType) -> SQLAUserT:
+    async def update_user(
+        user_id: FromPath[UUID | int], data: JSONBody[SQLAUserT], service: NamedDependency[UserServiceType]
+    ) -> SQLAUserT:
         """Update a user's attributes."""
         data.id = user_id  # type: ignore[assignment]
         return cast("SQLAUserT", await service.update_user(data))
@@ -579,7 +585,7 @@ def get_user_management_handler(
         dependencies={"service": Provide(provide_user_service, sync_to_thread=False)},
         tags=tags,
     )
-    async def delete_user(user_id: UUID | int, service: UserServiceType) -> SQLAUserT:
+    async def delete_user(user_id: FromPath[UUID | int], service: NamedDependency[UserServiceType]) -> SQLAUserT:
         """Delete a user from the database."""
 
         return cast("SQLAUserT", await service.delete_user(user_id))
@@ -627,7 +633,7 @@ def get_role_management_handler(
         dependencies={"service": Provide(provide_user_service, sync_to_thread=False)},
         tags=tags,
     )
-    async def create_role(data: SQLARoleT, service: UserServiceType) -> SQLARoleT:
+    async def create_role(data: JSONBody[SQLARoleT], service: NamedDependency[UserServiceType]) -> SQLARoleT:
         """Create a new role."""
         return cast("SQLARoleT", await service.add_role(data))
 
@@ -640,7 +646,11 @@ def get_role_management_handler(
         dependencies={"service": Provide(provide_user_service, sync_to_thread=False)},
         tags=tags,
     )
-    async def update_role(role_id: UUID | int, data: SQLARoleT, service: UserServiceType) -> SQLARoleT:
+    async def update_role(
+        role_id: Annotated[UUID | int, PathParameter()],
+        data: JSONBody[SQLARoleT],
+        service: NamedDependency[UserServiceType],
+    ) -> SQLARoleT:
         """Update a role in the database."""
         data.id = role_id  # type: ignore[assignment]
         return cast("SQLARoleT", await service.update_role(data))
@@ -654,7 +664,9 @@ def get_role_management_handler(
         dependencies={"service": Provide(provide_user_service, sync_to_thread=False)},
         tags=tags,
     )
-    async def delete_role(role_id: UUID | int, service: UserServiceType) -> SQLARoleT:
+    async def delete_role(
+        role_id: Annotated[UUID | int, PathParameter()], service: NamedDependency[UserServiceType]
+    ) -> SQLARoleT:
         """Delete a role from the database."""
 
         return cast("SQLARoleT", await service.delete_role(role_id))
@@ -667,7 +679,7 @@ def get_role_management_handler(
         dependencies={"service": Provide(provide_user_service, sync_to_thread=False)},
         tags=tags,
     )
-    async def assign_role(data: UserRoleSchema, service: UserServiceType) -> SQLAUserT:
+    async def assign_role(data: JSONBody[UserRoleSchema], service: NamedDependency[UserServiceType]) -> SQLAUserT:
         """Assign a role to a user."""
 
         return cast("SQLAUserT", await service.assign_role(data.user_id, data.role_id))
@@ -680,7 +692,7 @@ def get_role_management_handler(
         dependencies={"service": Provide(provide_user_service, sync_to_thread=False)},
         tags=tags,
     )
-    async def revoke_role(data: UserRoleSchema, service: UserServiceType) -> SQLAUserT:
+    async def revoke_role(data: JSONBody[UserRoleSchema], service: NamedDependency[UserServiceType]) -> SQLAUserT:
         """Revoke a role from a user."""
 
         return cast("SQLAUserT", await service.revoke_role(data.user_id, data.role_id))
