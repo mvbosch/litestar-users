@@ -68,7 +68,7 @@ class LitestarUsersSessionMiddleware(AbstractAuthenticationMiddleware):
 
     Missing or empty sessions produce a 401 unless the matched route handler
     declares ``AnonymousUser`` in its ``current_user`` parameter (e.g.
-    ``Annotated[MyUser | AnonymousUser, no_validation]``), in which case
+    ``SkipValidation[MyUser | AnonymousUser]``), in which case
     ``request.user`` is set to ``AnonymousUser``. A stale session (user no
     longer found or inactive/unverified) is always cleared; anonymous handling
     follows the same per-route rule.

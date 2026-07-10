@@ -1,4 +1,4 @@
-from .anonymous import AnonymousUser, no_validation
+from .anonymous import AnonymousUser
 from .config import JWTAuthConfig, JWTCookieAuthConfig, LitestarUsersConfig
 from .dependencies import provide_current_user
 from .main import LitestarUsersPlugin
@@ -9,6 +9,5 @@ __all__ = [
     "JWTCookieAuthConfig",
     "LitestarUsersConfig",
     "LitestarUsersPlugin",
-    "no_validation",
     "provide_current_user",
 ]

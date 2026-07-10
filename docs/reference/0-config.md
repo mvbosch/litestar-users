@@ -54,5 +54,3 @@ See [Route Handler Configurations](./2-route-handler-configs.md) for the full re
 ## Anonymous access
 
 ::: litestar_users.anonymous.AnonymousUser
-
-::: litestar_users.anonymous.no_validation

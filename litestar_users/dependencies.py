@@ -28,7 +28,7 @@ def provide_current_user(request: Request) -> Any:
 
         async def handler(current_user: MyUser) -> ...:  # auth required
         async def handler(
-            current_user: Annotated[MyUser | AnonymousUser, no_validation],
+            current_user: SkipValidation[MyUser | AnonymousUser],
         ) -> ...:  # anonymous OK
     """
     return request.user

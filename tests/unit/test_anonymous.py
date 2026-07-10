@@ -8,13 +8,14 @@ import sys
 import traceback
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Annotated, Any
+from typing import Any
 
 import pytest
 from litestar import Litestar, get
-from litestar.di import Provide
+from litestar.di import NamedDependency, Provide
 from litestar.middleware.base import DefineMiddleware
 from litestar.middleware.session.server_side import ServerSideSessionConfig
+from litestar.params import SkipValidation
 from litestar.security.jwt.token import Token
 from litestar.testing import TestClient
 from litestar.types import Empty
@@ -24,7 +25,6 @@ from litestar_users import (
     AnonymousUser,
     JWTAuthConfig,
     JWTCookieAuthConfig,
-    no_validation,
     provide_current_user,
 )
 from litestar_users.middleware import (
@@ -75,7 +75,7 @@ def _me_handler_anonymous_ok() -> Any:
     """Route that accepts both authenticated and anonymous users."""
 
     @get("/me", sync_to_thread=False)
-    def handler(current_user: Annotated[MockUser | AnonymousUser, no_validation]) -> dict:
+    def handler(current_user: NamedDependency[SkipValidation[MockUser | AnonymousUser]]) -> dict:
         return {
             "is_anonymous": isinstance(current_user, AnonymousUser),
         }
@@ -87,7 +87,7 @@ def _me_handler_auth_required() -> Any:
     """Route that requires an authenticated user."""
 
     @get("/me", sync_to_thread=False)
-    def handler(current_user: MockUser) -> dict:
+    def handler(current_user: NamedDependency[MockUser]) -> dict:
         return {
             "is_anonymous": isinstance(current_user, AnonymousUser),
         }

@@ -2,24 +2,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from litestar.connection import ASGIConnection
-from litestar.params import Dependency
 from litestar.types import Empty
 
-__all__ = ["AnonymousUser", "no_validation"]
-
-no_validation = Dependency(skip_validation=True)
-"""Annotated metadata that bypasses msgspec validation for a dependency.
-
-Required when typing ``current_user`` as a union that includes ``AnonymousUser``,
-because msgspec cannot coerce a union of two custom types::
-
-    from typing import Annotated
-    from litestar_users import AnonymousUser, no_validation
-
-    async def handler(
-        current_user: Annotated[MyUser | AnonymousUser, no_validation],
-    ) -> ...: ...
-"""
+__all__ = ["AnonymousUser"]
 
 
 @dataclass
@@ -44,7 +29,7 @@ def _route_allows_anonymous(connection: ASGIConnection) -> bool:
     Reads Litestar's already-parsed signature so no reflection is needed at
     request time. The handler must declare ``current_user`` as::
 
-        current_user: Annotated[MyUser | AnonymousUser, no_validation]
+        current_user: SkipValidation[MyUser | AnonymousUser]
     """
     param = connection.route_handler.parsed_fn_signature.parameters.get("current_user")
     if param is None:

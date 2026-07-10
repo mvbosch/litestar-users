@@ -65,7 +65,7 @@ class LitestarUsersJWTMiddleware(AbstractAuthenticationMiddleware):
 
     Missing credentials produce a 401 unless the matched route handler declares
     ``AnonymousUser`` in its ``current_user`` parameter (e.g.
-    ``Annotated[MyUser | AnonymousUser, no_validation]``), in which case
+    ``SkipValidation[MyUser | AnonymousUser]``), in which case
     ``request.user`` is set to ``AnonymousUser``. A present-but-invalid token
     always returns 401.
     """

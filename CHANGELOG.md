@@ -16,7 +16,7 @@
 - **breaking**: rename `data` parameter to `user` on `BaseUserService.update_user`.
 - **breaking**: rename `id_` parameter to `role_id` on `BaseUserService.get_role` and `delete_role`.
 - **breaking**: remove the `id_` positional parameter from `BaseUserService.update_role`; callers must set `data.id` before invoking.
-- add `AnonymousUser` and `no_validation` for opt-in anonymous access on individual route handlers.
+- add `AnonymousUser` for opt-in anonymous access on individual route handlers.
 - add `OAuth2HandlerConfig` to `__all__` in `litestar_users.config`.
 - add example tests covering registration, login, duplicate rejection, and route registration for all three example applications.
 - update documentation to reflect all API changes.
