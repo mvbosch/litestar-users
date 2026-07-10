@@ -9,6 +9,7 @@ from uuid import UUID
 import pytest
 from advanced_alchemy.base import UUIDBase
 from advanced_alchemy.config import AsyncSessionConfig
+from advanced_alchemy.exceptions import RepositoryError
 from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO, SQLAlchemyDTOConfig
 from advanced_alchemy.extensions.litestar.plugins import SQLAlchemyAsyncConfig, SQLAlchemyInitPlugin
 from advanced_alchemy.repository import SQLAlchemyAsyncRepository
@@ -16,7 +17,6 @@ from litestar import Litestar
 from litestar.datastructures import State
 from litestar.dto import DataclassDTO
 from litestar.middleware.session.server_side import ServerSideSessionConfig
-from litestar.repository.exceptions import RepositoryError
 from litestar.security.jwt import Token
 from litestar.testing import TestClient
 from sqlalchemy import Text
