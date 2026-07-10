@@ -128,22 +128,21 @@ auth_config = JWTAuthConfig()
 
 ## Anonymous users
 
-By default every route (except those in `auth_exclude_paths`) requires a valid session or token. If you need a route to be accessible to unauthenticated callers without excluding it globally, Litestar-Users provides [`AnonymousUser`][litestar_users.anonymous.AnonymousUser] and [`no_validation`][litestar_users.anonymous.no_validation].
+By default every route (except those in `auth_exclude_paths`) requires a valid session or token. If you need a route to be accessible to unauthenticated callers without excluding it globally, Litestar-Users provides [`AnonymousUser`][litestar_users.anonymous.AnonymousUser].
 
 Declare `current_user` as a union that includes `AnonymousUser` on any handler that should accept unauthenticated requests. The middleware will set `request.user` to an `AnonymousUser` instance instead of raising a 401, and you can distinguish the two cases with `isinstance`:
 
 ```python
-from typing import Annotated
-
 from litestar import get
-from litestar_users import AnonymousUser, no_validation
+from litestar.di import SkipValidation
+from litestar_users import AnonymousUser
 
 from .models import User
 
 
 @get("/feed")
 async def feed(
-    current_user: Annotated[User | AnonymousUser, no_validation],
+    current_user: SkipValidation[User | AnonymousUser],
 ) -> list[str]:
     if isinstance(current_user, AnonymousUser):
         return ["public item 1", "public item 2"]
@@ -157,4 +156,4 @@ async def feed(
 `AnonymousUser` exposes the same base attributes as a real user (`id`, `is_active`, `is_verified`, `roles`, `oauth_accounts`) with safe sentinel defaults, so code that inspects those fields does not need special-casing.
 
 !!! note
-    The `no_validation` annotation is required because msgspec cannot coerce a union of two custom types. Without it Litestar will raise a validation error when it tries to deserialise the dependency. It is simply `Dependency(skip_validation=True)` - you can use that directly if you prefer not to import `no_validation`.
+    The `SkipValidation` annotation is required because msgspec cannot coerce a union of two custom types. Without it Litestar will raise a validation error when it tries to deserialise the dependency.
