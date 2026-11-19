@@ -401,7 +401,7 @@ def get_auth_handler(
         opt=opt,
     )
     async def login_session(
-        data: authentication_schema,  # pyright: ignore
+        data: JSONBody[authentication_schema],  # pyright: ignore
         service: NamedDependency[UserServiceType],
         request: Request,
     ) -> SQLAUserT:
@@ -423,7 +423,7 @@ def get_auth_handler(
         opt=opt,
     )
     async def login_jwt(
-        data: authentication_schema,  # pyright: ignore
+        data: JSONBody[authentication_schema],  # pyright: ignore
         service: NamedDependency[UserServiceType],
         request: Request,
     ) -> Response[SQLAUserT]:
@@ -505,7 +505,7 @@ def get_password_reset_handler(forgot_path: str, reset_path: str, tags: list[str
         exclude_from_auth=True,
         tags=tags,
     )
-    async def forgot_password(data: ForgotPasswordSchema, service: NamedDependency[UserServiceType]) -> None:
+    async def forgot_password(data: JSONBody[ForgotPasswordSchema], service: NamedDependency[UserServiceType]) -> None:
         await service.initiate_password_reset(data.email)
         return
 
@@ -515,7 +515,7 @@ def get_password_reset_handler(forgot_path: str, reset_path: str, tags: list[str
         exclude_from_auth=True,
         tags=tags,
     )
-    async def reset_password(data: ResetPasswordSchema, service: NamedDependency[UserServiceType]) -> None:
+    async def reset_password(data: JSONBody[ResetPasswordSchema], service: NamedDependency[UserServiceType]) -> None:
         await service.reset_password(data.token, data.password)
         return
 
